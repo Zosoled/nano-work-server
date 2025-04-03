@@ -40,29 +40,29 @@ static inline ulong rotr64(ulong x, int shift)
 }
 #endif
 
-#define G32(m0, m1, m2, m3, vva, vb1, vb2, vvc, vd1, vd2) \
-    do {                                                  \
-        vva += (ulong2)(vb1 + m0, vb2 + m2);              \
-        vd1 = rotr64(vd1 ^ vva.s0, 32);                   \
-        vd2 = rotr64(vd2 ^ vva.s1, 32);                   \
-        vvc += (ulong2)(vd1, vd2);                        \
-        vb1 = rotr64(vb1 ^ vvc.s0, 24);                   \
-        vb2 = rotr64(vb2 ^ vvc.s1, 24);                   \
-        vva += (ulong2)(vb1 + m1, vb2 + m3);              \
-        vd1 = rotr64(vd1 ^ vva.s0, 16);                   \
-        vd2 = rotr64(vd2 ^ vva.s1, 16);                   \
-        vvc += (ulong2)(vd1, vd2);                        \
-        vb1 = rotr64(vb1 ^ vvc.s0, 63);                   \
-        vb2 = rotr64(vb2 ^ vvc.s1, 63);                   \
+#define G(m0, m1, m2, m3, vva, vb1, vb2, vvc, vd1, vd2) \
+    do {                                                \
+        vva += (ulong2)(vb1 + m0, vb2 + m2);            \
+        vd1 = rotr64(vd1 ^ vva.s0, 32);                 \
+        vd2 = rotr64(vd2 ^ vva.s1, 32);                 \
+        vvc += (ulong2)(vd1, vd2);                      \
+        vb1 = rotr64(vb1 ^ vvc.s0, 24);                 \
+        vb2 = rotr64(vb2 ^ vvc.s1, 24);                 \
+        vva += (ulong2)(vb1 + m1, vb2 + m3);            \
+        vd1 = rotr64(vd1 ^ vva.s0, 16);                 \
+        vd2 = rotr64(vd2 ^ vva.s1, 16);                 \
+        vvc += (ulong2)(vd1, vd2);                      \
+        vb1 = rotr64(vb1 ^ vvc.s0, 63);                 \
+        vb2 = rotr64(vb2 ^ vvc.s1, 63);                 \
     } while (0)
 
 #define ROUND(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, \
               m15)                                                             \
     do {                                                                       \
-        G32(m0, m1, m2, m3, vv[0 / 2], vv[4 / 2].s0, vv[4 / 2].s1, vv[8 / 2], vv[12 / 2].s0, vv[12 / 2].s1);     \
-        G32(m4, m5, m6, m7, vv[2 / 2], vv[6 / 2].s0, vv[6 / 2].s1, vv[10 / 2], vv[14 / 2].s0, vv[14 / 2].s1);    \
-        G32(m8, m9, m10, m11, vv[0 / 2], vv[5 / 2].s1, vv[6 / 2].s0, vv[10 / 2], vv[15 / 2].s1, vv[12 / 2].s0);  \
-        G32(m12, m13, m14, m15, vv[2 / 2], vv[7 / 2].s1, vv[4 / 2].s0, vv[8 / 2], vv[13 / 2].s1, vv[14 / 2].s0); \
+        G(m0, m1, m2, m3, vv[0], vv[2].s0, vv[2].s1, vv[4], vv[6].s0, vv[6].s1);     \
+        G(m4, m5, m6, m7, vv[1], vv[3].s0, vv[3].s1, vv[5], vv[7].s0, vv[7].s1);     \
+        G(m8, m9, m10, m11, vv[0], vv[2].s1, vv[3].s0, vv[5], vv[7].s1, vv[6].s0);   \
+        G(m12, m13, m14, m15, vv[1], vv[3].s1, vv[2].s0, vv[4], vv[6].s1, vv[7].s0); \
     } while (0)
 
 static inline ulong blake2b(ulong const nonce, __constant ulong *h)
@@ -89,7 +89,7 @@ static inline ulong blake2b(ulong const nonce, __constant ulong *h)
 
     return IV_0 ^ vv[0].s0 ^ vv[4].s0;
 }
-#undef G32
+#undef G
 #undef ROUND
 
 __kernel void nano_work(__constant uchar *attempt,
