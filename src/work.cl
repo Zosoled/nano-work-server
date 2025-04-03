@@ -1,18 +1,27 @@
-enum Blake2b_IV {
-    iv0 = 0x6a09e667f3bcc908UL,
-    iv1 = 0xbb67ae8584caa73bUL,
-    iv2 = 0x3c6ef372fe94f82bUL,
-    iv3 = 0xa54ff53a5f1d36f1UL,
-    iv4 = 0x510e527fade682d1UL,
-    iv5 = 0x9b05688c2b3e6c1fUL,
-    iv6 = 0x1f83d9abfb41bd6bUL,
-    iv7 = 0x5be0cd19137e2179UL,
-};
-
-enum IV_Derived {
-    nano_xor_iv0 = 0x6a09e667f2bdc900UL,  // iv1 ^ 0x1010000 ^ outlen
-    nano_xor_iv4 = 0x510e527fade682f9UL,  // iv4 ^ inbytes
-    nano_xor_iv6 = 0xe07c265404be4294UL,  // iv6 ^ ~0
+/**
+ * BLAKE2b initialization
+ *
+ * param block: 0x01010008 (depth = 1, fanout = 1, digest byte length = 8)
+ * input length: 0x28 (40 bytes)
+ * digest finalization flag: 0xffffffffffffffffUL (~0)
+ */
+enum BLAKE2B_IV {
+    IV_0 = 0x6a09e667f2bdc900UL, // 0x6a09e667f3bcc908UL ^ PARAM
+    IV_1 = 0xbb67ae8584caa73bUL,
+    IV_2 = 0x3c6ef372fe94f82bUL,
+    IV_3 = 0xa54ff53a5f1d36f1UL,
+    IV_4 = 0x510e527fade682d1UL,
+    IV_5 = 0x9b05688c2b3e6c1fUL,
+    IV_6 = 0x1f83d9abfb41bd6bUL,
+    IV_7 = 0x5be0cd19137e2179UL,
+    IV_8 = 0x6a09e667f3bcc908UL,
+    IV_9 = 0xbb67ae8584caa73bUL,
+    IV_10 = 0x3c6ef372fe94f82bUL,
+    IV_11 = 0xa54ff53a5f1d36f1UL,
+    IV_12 = 0x510e527fade682f9UL, // 0x510e527fade682d1UL ^ INLEN
+    IV_13 = 0x9b05688c2b3e6c1fUL,
+    IV_14 = 0xe07c265404be4294UL, // 0x1f83d9abfb41bd6bUL ^ DIGEST
+    IV_15 = 0x5be0cd19137e2179UL,
 };
 
 #ifdef cl_amd_media_ops
@@ -68,9 +77,10 @@ static inline ulong rotr64(ulong x, int shift)
 static inline ulong blake2b(ulong const nonce, __constant ulong *h)
 {
     ulong2 vv[8] = {
-        {nano_xor_iv0, iv1}, {iv2, iv3},          {iv4, iv5},
-        {iv6, iv7},          {iv0, iv1},          {iv2, iv3},
-        {nano_xor_iv4, iv5}, {nano_xor_iv6, iv7},
+        { IV_0, IV_1 },   { IV_2, IV_3 },
+        { IV_4, IV_5 },   { IV_6, IV_7 },
+        { IV_8, IV_9 },   { IV_10, IV_11 },
+        { IV_12, IV_13 }, { IV_14, IV_15 },
     };
 
     ROUND(nonce, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
@@ -86,7 +96,7 @@ static inline ulong blake2b(ulong const nonce, __constant ulong *h)
     ROUND(nonce, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     ROUND(0, 0, h[3], 0, 0, 0, 0, 0, h[0], 0, nonce, h[1], 0, 0, 0, h[2]);
 
-    return nano_xor_iv0 ^ vv[0].s0 ^ vv[4].s0;
+    return IV_0 ^ vv[0].s0 ^ vv[4].s0;
 }
 #undef G32
 #undef G2v
@@ -94,9 +104,9 @@ static inline ulong blake2b(ulong const nonce, __constant ulong *h)
 #undef ROUND
 
 __kernel void nano_work(__constant uchar *attempt,
-                        __global uchar *result_a,
-                        __constant uchar *item_a,
-                        const ulong difficulty)
+    __global uchar *result_a,
+    __constant uchar *item_a,
+    const ulong difficulty)
 {
     const ulong attempt_l = *((__constant ulong *) attempt) + get_global_id(0);
     if (blake2b(attempt_l, item_a) >= difficulty)
