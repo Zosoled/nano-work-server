@@ -38,11 +38,6 @@ static inline ulong rotr64(ulong x, int shift) {
 }
 #endif
 
-ulong4 a;
-ulong4 b;
-ulong4 c;
-ulong4 d;
-
 #define G(a, b, c, d, x, y)                                                    \
   do {                                                                         \
     a += b + x;                                                                \
