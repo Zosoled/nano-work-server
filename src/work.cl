@@ -56,22 +56,13 @@ static inline ulong rotr64(ulong x, int shift)
         vb2 = rotr64(vb2 ^ vvc.s1, 63);                   \
     } while (0)
 
-#define G2v(m0, m1, m2, m3, a, b, c, d)                                   \
-    G32(m0, m1, m2, m3, vv[a / 2], vv[b / 2].s0, vv[b / 2].s1, vv[c / 2], \
-        vv[d / 2].s0, vv[d / 2].s1)
-
-#define G2v_split(m0, m1, m2, m3, a, vb1, vb2, c, vd1, vd2) \
-    G32(m0, m1, m2, m3, vv[a / 2], vb1, vb2, vv[c / 2], vd1, vd2)
-
 #define ROUND(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, \
               m15)                                                             \
     do {                                                                       \
-        G2v(m0, m1, m2, m3, 0, 4, 8, 12);                                      \
-        G2v(m4, m5, m6, m7, 2, 6, 10, 14);                                     \
-        G2v_split(m8, m9, m10, m11, 0, vv[5 / 2].s1, vv[6 / 2].s0, 10,         \
-                  vv[15 / 2].s1, vv[12 / 2].s0);                               \
-        G2v_split(m12, m13, m14, m15, 2, vv[7 / 2].s1, vv[4 / 2].s0, 8,        \
-                  vv[13 / 2].s1, vv[14 / 2].s0);                               \
+        G32(m0, m1, m2, m3, vv[0 / 2], vv[4 / 2].s0, vv[4 / 2].s1, vv[8 / 2], vv[12 / 2].s0, vv[12 / 2].s1);     \
+        G32(m4, m5, m6, m7, vv[2 / 2], vv[6 / 2].s0, vv[6 / 2].s1, vv[10 / 2], vv[14 / 2].s0, vv[14 / 2].s1);    \
+        G32(m8, m9, m10, m11, vv[0 / 2], vv[5 / 2].s1, vv[6 / 2].s0, vv[10 / 2], vv[15 / 2].s1, vv[12 / 2].s0);  \
+        G32(m12, m13, m14, m15, vv[2 / 2], vv[7 / 2].s1, vv[4 / 2].s0, vv[8 / 2], vv[13 / 2].s1, vv[14 / 2].s0); \
     } while (0)
 
 static inline ulong blake2b(ulong const nonce, __constant ulong *h)
@@ -99,8 +90,6 @@ static inline ulong blake2b(ulong const nonce, __constant ulong *h)
     return IV_0 ^ vv[0].s0 ^ vv[4].s0;
 }
 #undef G32
-#undef G2v
-#undef G2v_split
 #undef ROUND
 
 __kernel void nano_work(__constant uchar *attempt,
