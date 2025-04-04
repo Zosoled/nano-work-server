@@ -6,7 +6,7 @@
  * digest finalization flag: 0xffffffffffffffffUL (~0)
  */
 enum BLAKE2B_IV {
-    IV_0 = 0x6a09e667f2bdc900UL, // 0x6a09e667f3bcc908UL ^ PARAM
+    IV_0 = 0x6a09e667f3bcc908UL,
     IV_1 = 0xbb67ae8584caa73bUL,
     IV_2 = 0x3c6ef372fe94f82bUL,
     IV_3 = 0xa54ff53a5f1d36f1UL,
@@ -14,14 +14,9 @@ enum BLAKE2B_IV {
     IV_5 = 0x9b05688c2b3e6c1fUL,
     IV_6 = 0x1f83d9abfb41bd6bUL,
     IV_7 = 0x5be0cd19137e2179UL,
-    IV_8 = 0x6a09e667f3bcc908UL,
-    IV_9 = 0xbb67ae8584caa73bUL,
-    IV_10 = 0x3c6ef372fe94f82bUL,
-    IV_11 = 0xa54ff53a5f1d36f1UL,
-    IV_12 = 0x510e527fade682f9UL, // 0x510e527fade682d1UL ^ INLEN
-    IV_13 = 0x9b05688c2b3e6c1fUL,
-    IV_14 = 0xe07c265404be4294UL, // 0x1f83d9abfb41bd6bUL ^ DIGEST
-    IV_15 = 0x5be0cd19137e2179UL,
+    IV_PARAM = 0x6a09e667f2bdc900UL, // 0x6a09e667f3bcc908UL ^ PARAM
+    IV_INLEN = 0x510e527fade682f9UL, // 0x510e527fade682d1UL ^ INLEN
+    IV_DIGEST = 0xe07c265404be4294UL, // 0x1f83d9abfb41bd6bUL ^ DIGEST
 };
 
 #ifdef cl_amd_media_ops
@@ -56,48 +51,50 @@ static inline ulong rotr64(ulong x, int shift)
         vb2 = rotr64(vb2 ^ vvc.s1, 63);                 \
     } while (0)
 
-#define ROUND(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, \
-              m15)                                                             \
-    do {                                                                       \
-        G(m0, m1, m2, m3, vv[0], vv[2].s0, vv[2].s1, vv[4], vv[6].s0, vv[6].s1);     \
-        G(m4, m5, m6, m7, vv[1], vv[3].s0, vv[3].s1, vv[5], vv[7].s0, vv[7].s1);     \
-        G(m8, m9, m10, m11, vv[0], vv[2].s1, vv[3].s0, vv[5], vv[7].s1, vv[6].s0);   \
-        G(m12, m13, m14, m15, vv[1], vv[3].s1, vv[2].s0, vv[4], vv[6].s1, vv[7].s0); \
+#define R(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, m15)    \
+    do {                                                                           \
+        G(m0, m1, m2, m3, vv[0], vv[2].s0, vv[2].s1, vv[4], vv[6].s0, vv[6].s1);   \
+        G(m4, m5, m6, m7, vv[1], vv[3].s0, vv[3].s1, vv[5], vv[7].s0, vv[7].s1);   \
+        G(m8, m9, m10, m11, vv[0], vv[2].s1, vv[3].s0, vv[5], vv[7].s1, vv[6].s0); \
+        G(m12, m13, m14, m15, vv[1], vv[3].s1, vv[2].s0, vv[4], vv[6].s1,          \
+            vv[7].s0);                                                             \
     } while (0)
 
-static inline ulong blake2b(ulong const nonce, __constant ulong *h)
+static inline ulong blake2b(ulong const nonce, __constant ulong* h)
 {
     ulong2 vv[8] = {
-        { IV_0, IV_1 },   { IV_2, IV_3 },
-        { IV_4, IV_5 },   { IV_6, IV_7 },
-        { IV_8, IV_9 },   { IV_10, IV_11 },
-        { IV_12, IV_13 }, { IV_14, IV_15 },
+        { IV_PARAM, IV_1 },
+        { IV_2, IV_3 },
+        { IV_4, IV_5 },
+        { IV_6, IV_7 },
+        { IV_0, IV_1 },
+        { IV_2, IV_3 },
+        { IV_INLEN, IV_5 },
+        { IV_DIGEST, IV_7 },
     };
 
-    ROUND(nonce, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    ROUND(0, 0, h[3], 0, 0, 0, 0, 0, h[0], 0, nonce, h[1], 0, 0, 0, h[2]);
-    ROUND(0, 0, 0, nonce, 0, h[1], 0, 0, 0, 0, h[2], 0, 0, h[0], 0, h[3]);
-    ROUND(0, 0, h[2], h[0], 0, 0, 0, 0, h[1], 0, 0, 0, h[3], nonce, 0, 0);
-    ROUND(0, nonce, 0, 0, h[1], h[3], 0, 0, 0, h[0], 0, 0, 0, 0, h[2], 0);
-    ROUND(h[1], 0, 0, 0, nonce, 0, 0, h[2], h[3], 0, 0, 0, 0, 0, h[0], 0);
-    ROUND(0, 0, h[0], 0, 0, 0, h[3], 0, nonce, 0, 0, h[2], 0, h[1], 0, 0);
-    ROUND(0, 0, 0, 0, 0, h[0], h[2], 0, 0, nonce, 0, h[3], 0, 0, h[1], 0);
-    ROUND(0, 0, 0, 0, 0, h[2], nonce, 0, 0, h[1], 0, 0, h[0], h[3], 0, 0);
-    ROUND(0, h[1], 0, h[3], 0, 0, h[0], 0, 0, 0, 0, 0, h[2], 0, 0, nonce);
-    ROUND(nonce, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    ROUND(0, 0, h[3], 0, 0, 0, 0, 0, h[0], 0, nonce, h[1], 0, 0, 0, h[2]);
+    R(nonce, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    R(0, 0, h[3], 0, 0, 0, 0, 0, h[0], 0, nonce, h[1], 0, 0, 0, h[2]);
+    R(0, 0, 0, nonce, 0, h[1], 0, 0, 0, 0, h[2], 0, 0, h[0], 0, h[3]);
+    R(0, 0, h[2], h[0], 0, 0, 0, 0, h[1], 0, 0, 0, h[3], nonce, 0, 0);
+    R(0, nonce, 0, 0, h[1], h[3], 0, 0, 0, h[0], 0, 0, 0, 0, h[2], 0);
+    R(h[1], 0, 0, 0, nonce, 0, 0, h[2], h[3], 0, 0, 0, 0, 0, h[0], 0);
+    R(0, 0, h[0], 0, 0, 0, h[3], 0, nonce, 0, 0, h[2], 0, h[1], 0, 0);
+    R(0, 0, 0, 0, 0, h[0], h[2], 0, 0, nonce, 0, h[3], 0, 0, h[1], 0);
+    R(0, 0, 0, 0, 0, h[2], nonce, 0, 0, h[1], 0, 0, h[0], h[3], 0, 0);
+    R(0, h[1], 0, h[3], 0, 0, h[0], 0, 0, 0, 0, 0, h[2], 0, 0, nonce);
+    R(nonce, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    R(0, 0, h[3], 0, 0, 0, 0, 0, h[0], 0, nonce, h[1], 0, 0, 0, h[2]);
 
     return IV_0 ^ vv[0].s0 ^ vv[4].s0;
 }
 #undef G
-#undef ROUND
+#undef R
 
-__kernel void nano_work(__constant uchar *attempt,
-    __global uchar *result_a,
-    __constant uchar *item_a,
-    const ulong difficulty)
+__kernel void nano_work(__constant uchar* attempt, __global uchar* result_a,
+    __constant uchar* item_a, const ulong difficulty)
 {
-    const ulong attempt_l = *((__constant ulong *) attempt) + get_global_id(0);
+    const ulong attempt_l = *((__constant ulong*)attempt) + get_global_id(0);
     if (blake2b(attempt_l, item_a) >= difficulty)
-        *((__global ulong *) result_a) = attempt_l;
+        *((__global ulong*)result_a) = attempt_l;
 }
