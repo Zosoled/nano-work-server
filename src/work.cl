@@ -54,9 +54,9 @@ static inline ulong4 rotr64(ulong4 x, int shift)
 
 #define ROUND(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, mA, mB, mC, mD, mE, mF) \
     do {                                                                      \
-        G(v.s0123, v.s4567, v.s89AB, v.sCEDF, (ulong4)(m0, m2, m4, m6),       \
+        G(v.s0123, v.s4567, v.s89AB, v.sCDEF, (ulong4)(m0, m2, m4, m6),       \
             (ulong4)(m1, m3, m5, m7));                                        \
-        G(v.s0123, v.s5674, v.sAB89, v.sFCED, (ulong4)(m8, mA, mC, mE),       \
+        G(v.s0123, v.s5674, v.sAB89, v.sFCDE, (ulong4)(m8, mA, mC, mE),       \
             (ulong4)(m9, mB, mD, mF));                                        \
     } while (0)
 
