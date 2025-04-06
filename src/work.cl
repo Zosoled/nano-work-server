@@ -65,7 +65,8 @@ static inline ulong blake2b(ulong const n, __constant ulong* h)
         n, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
 
-    ROUND(m.s0246, m.s1357, m.s8ACE, m.s9BDF);
+    // ROUND(m.s0246, m.s1357, m.s8ACE, m.s9BDF);
+    ROUND((ulong4)(n, h[0], h[1], h[2]), (ulong4)(h[3], 0, 0, 0), (ulong4)(0, 0, 0, 0), (ulong4)(0, 0, 0, 0));
     ROUND((ulong4)(0, 0, h[3], 0), (ulong4)(0, 0, 0, 0), (ulong4)(h[0], 0, n, h[1]), (ulong4)(0, 0, 0, h[2]));
     ROUND((ulong4)(0, 0, 0, n), (ulong4)(0, h[1], 0, 0), (ulong4)(0, 0, h[2], 0), (ulong4)(0, h[0], 0, h[3]));
     ROUND((ulong4)(0, 0, h[2], h[0]), (ulong4)(0, 0, 0, 0), (ulong4)(h[1], 0, 0, 0), (ulong4)(h[3], n, 0, 0));
@@ -76,7 +77,6 @@ static inline ulong blake2b(ulong const n, __constant ulong* h)
     ROUND((ulong4)(0, 0, 0, 0), (ulong4)(0, h[2], n, 0), (ulong4)(0, h[1], 0, 0), (ulong4)(h[0], h[3], 0, 0));
     ROUND((ulong4)(0, h[1], 0, h[3]), (ulong4)(0, 0, h[0], 0), (ulong4)(0, 0, 0, 0), (ulong4)(h[2], 0, 0, n));
     ROUND((ulong4)(0, 0, h[3], 0), (ulong4)(0, 0, 0, 0), (ulong4)(h[0], 0, n, h[1]), (ulong4)(0, 0, 0, h[2]));
-    ROUND((ulong4)(0, 0, 0, n), (ulong4)(0, h[1], 0, 0), (ulong4)(0, 0, h[2], 0), (ulong4)(0, h[0], 0, h[3]));
 
     return IV_0 ^ v.s0 ^ v.s8;
 }
