@@ -47,12 +47,10 @@ static inline ulong4 rotr64(ulong4 x, int shift)
         b = rotr64(b ^ c, 63); \
     } while (0)
 
-#define ROUND(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, mA, mB, mC, mD, mE, mF) \
+#define ROUND(x0, y0, x1, y1) \
     do {                                                                      \
-        G(v.s0123, v.s4567, v.s89AB, v.sCDEF, (ulong4)(m0, m2, m4, m6),       \
-            (ulong4)(m1, m3, m5, m7));                                        \
-        G(v.s0123, v.s5674, v.sAB89, v.sFCDE, (ulong4)(m8, mA, mC, mE),       \
-            (ulong4)(m9, mB, mD, mF));                                        \
+        G(v.s0123, v.s4567, v.s89AB, v.sCDEF, x0, y0);                                        \
+        G(v.s0123, v.s5674, v.sAB89, v.sFCDE, x1, y1);                                        \
     } while (0)
 
 // n: nonce
@@ -63,19 +61,22 @@ static inline ulong blake2b(ulong const n, __constant ulong* h)
         IV_PARAM, IV_1, IV_2, IV_3, IV_4, IV_5, IV_6, IV_7,
         IV_0, IV_1, IV_2, IV_3, IV_INLEN, IV_5, IV_DIGEST, IV_7
     };
+    ulong16 m = {
+        n, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+    };
 
-    ROUND(n, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    ROUND(0, 0, h[3], 0, 0, 0, 0, 0, h[0], 0, n, h[1], 0, 0, 0, h[2]);
-    ROUND(0, 0, 0, n, 0, h[1], 0, 0, 0, 0, h[2], 0, 0, h[0], 0, h[3]);
-    ROUND(0, 0, h[2], h[0], 0, 0, 0, 0, h[1], 0, 0, 0, h[3], n, 0, 0);
-    ROUND(0, n, 0, 0, h[1], h[3], 0, 0, 0, h[0], 0, 0, 0, 0, h[2], 0);
-    ROUND(h[1], 0, 0, 0, n, 0, 0, h[2], h[3], 0, 0, 0, 0, 0, h[0], 0);
-    ROUND(0, 0, h[0], 0, 0, 0, h[3], 0, n, 0, 0, h[2], 0, h[1], 0, 0);
-    ROUND(0, 0, 0, 0, 0, h[0], h[2], 0, 0, n, 0, h[3], 0, 0, h[1], 0);
-    ROUND(0, 0, 0, 0, 0, h[2], n, 0, 0, h[1], 0, 0, h[0], h[3], 0, 0);
-    ROUND(0, h[1], 0, h[3], 0, 0, h[0], 0, 0, 0, 0, 0, h[2], 0, 0, n);
-    ROUND(n, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
-    ROUND(0, 0, h[3], 0, 0, 0, 0, 0, h[0], 0, n, h[1], 0, 0, 0, h[2]);
+    ROUND(m.s0246, m.s1357, m.s8ACE, m.s9BDF);
+    ROUND((ulong4)(0, 0, h[3], 0), (ulong4)(0, 0, 0, 0), (ulong4)(h[0], 0, n, h[1]), (ulong4)(0, 0, 0, h[2]));
+    ROUND((ulong4)(0, 0, 0, n), (ulong4)(0, h[1], 0, 0), (ulong4)(0, 0, h[2], 0), (ulong4)(0, h[0], 0, h[3]));
+    ROUND((ulong4)(0, 0, h[2], h[0]), (ulong4)(0, 0, 0, 0), (ulong4)(h[1], 0, 0, 0), (ulong4)(h[3], n, 0, 0));
+    ROUND((ulong4)(0, n, 0, 0), (ulong4)(h[1], h[3], 0, 0), (ulong4)(0, h[0], 0, 0), (ulong4)(0, 0, h[2], 0));
+    ROUND((ulong4)(h[1], 0, 0, 0), (ulong4)(n, 0, 0, h[2]), (ulong4)(h[3], 0, 0, 0), (ulong4)(0, 0, h[0], 0));
+    ROUND((ulong4)(0, 0, h[0], 0), (ulong4)(0, 0, h[3], 0), (ulong4)(n, 0, 0, h[2]), (ulong4)(0, h[1], 0, 0));
+    ROUND((ulong4)(0, 0, 0, 0), (ulong4)(0, h[0], h[2], 0), (ulong4)(0, n, 0, h[3]), (ulong4)(0, 0, h[1], 0));
+    ROUND((ulong4)(0, 0, 0, 0), (ulong4)(0, h[2], n, 0), (ulong4)(0, h[1], 0, 0), (ulong4)(h[0], h[3], 0, 0));
+    ROUND((ulong4)(0, h[1], 0, h[3]), (ulong4)(0, 0, h[0], 0), (ulong4)(0, 0, 0, 0), (ulong4)(h[2], 0, 0, n));
+    ROUND((ulong4)(0, 0, h[3], 0), (ulong4)(0, 0, 0, 0), (ulong4)(h[0], 0, n, h[1]), (ulong4)(0, 0, 0, h[2]));
+    ROUND((ulong4)(0, 0, 0, n), (ulong4)(0, h[1], 0, 0), (ulong4)(0, 0, h[2], 0), (ulong4)(0, h[0], 0, h[3]));
 
     return IV_0 ^ v.s0 ^ v.s8;
 }
