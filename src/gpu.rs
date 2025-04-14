@@ -11,9 +11,9 @@ use byteorder::{ByteOrder, LittleEndian};
 
 pub struct Gpu {
     kernel: ocl::Kernel,
-    attempt: Buffer<u8>,
+    seed: Buffer<u8>,
     result: Buffer<u8>,
-    root: Buffer<u8>,
+    blockhash: Buffer<u8>,
 }
 
 impl Gpu {
@@ -51,7 +51,7 @@ impl Gpu {
             device.name().unwrap_or_else(|_| "[unknown]".into())
         );
 
-        let attempt = Buffer::<u8>::builder()
+        let seed = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
             .flags(MemFlags::new().read_only().host_write_only())
             .len(8)
@@ -61,7 +61,7 @@ impl Gpu {
             .flags(MemFlags::new().write_only())
             .len(8)
             .build()?;
-        let root = Buffer::<u8>::builder()
+        let blockhash = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
             .flags(MemFlags::new().read_only().host_write_only())
             .len(32)
@@ -70,12 +70,12 @@ impl Gpu {
         let difficulty = 0u64;
 
         let kernel = {
-            let mut kernel_builder = pro_que.kernel_builder("nano_work");
+            let mut kernel_builder = pro_que.kernel_builder("work_generate");
             kernel_builder
                 .global_work_size(threads)
-                .arg(&attempt)
+                .arg(&seed)
                 .arg(&result)
-                .arg(&root)
+                .arg(&blockhash)
                 .arg_named("difficulty", &difficulty);
             if let Some(local_work_size) = local_work_size {
                 kernel_builder.local_work_size(local_work_size);
@@ -85,9 +85,9 @@ impl Gpu {
 
         let mut gpu = Gpu {
             kernel,
-            attempt,
+            seed,
             result,
-            root,
+            blockhash,
         };
         gpu.reset_bufs()?;
         Ok(gpu)
@@ -98,17 +98,17 @@ impl Gpu {
         Ok(())
     }
 
-    pub fn set_task(&mut self, root: &[u8], difficulty: u64) -> Result<()> {
+    pub fn set_task(&mut self, blockhash: &[u8], difficulty: u64) -> Result<()> {
         self.reset_bufs()?;
-        self.root.write(root).enq()?;
+        self.blockhash.write(blockhash).enq()?;
         self.kernel.set_arg("difficulty", difficulty)?;
         Ok(())
     }
 
-    pub fn run(&mut self, out: &mut [u8], attempt: u64) -> Result<bool> {
-        let mut attempt_bytes = [0u8; 8];
-        LittleEndian::write_u64(&mut attempt_bytes, attempt);
-        self.attempt.write(&attempt_bytes as &[u8]).enq()?;
+    pub fn run(&mut self, out: &mut [u8], seed: u64) -> Result<bool> {
+        let mut seed_bytes = [0u8; 8];
+        LittleEndian::write_u64(&mut seed_bytes, seed);
+        self.seed.write(&seed_bytes as &[u8]).enq()?;
         debug_assert!(out.iter().all(|&b| b == 0));
         debug_assert!({
             let mut result = [0u8; 8];

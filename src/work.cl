@@ -47,10 +47,10 @@ static inline ulong4 rotr64(ulong4 x, int shift)
         b = rotr64(b ^ c, 63); \
     } while (0)
 
-#define ROUND(m) \
-    do {                                                                      \
-        G(v.s0123, v.s4567, v.s89AB, v.sCDEF, m.s0246, m.s1357);                                        \
-        G(v.s0123, v.s5674, v.sAB89, v.sFCDE, m.s8ACE, m.s9BDF);                                        \
+#define ROUND(m)                                                 \
+    do {                                                         \
+        G(v.s0123, v.s4567, v.s89AB, v.sCDEF, m.s0246, m.s1357); \
+        G(v.s0123, v.s5674, v.sAB89, v.sFCDE, m.s8ACE, m.s9BDF); \
     } while (0)
 
 // n: nonce
@@ -83,12 +83,13 @@ static inline ulong blake2b(ulong const n, __constant ulong* h)
 #undef G
 #undef ROUND
 
-__kernel void nano_work(__constant ulong* attempt,
-    __global ulong* result_a,
-    __constant ulong* item_a,
+__kernel void work_generate(
+    __constant uchar* seed,
+    __global uchar* result,
+    __constant uchar* blockhash,
     const ulong difficulty)
 {
-    const ulong attempt_l = *attempt + get_global_id(0);
-    if (blake2b(attempt_l, item_a) >= difficulty)
-        *result_a = attempt_l;
+    const ulong nonce = *seed + get_global_id(0);
+    if (blake2b(nonce, (__constant ulong*)blockhash) >= difficulty)
+        *result = nonce;
 }
