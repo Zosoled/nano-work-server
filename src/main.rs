@@ -27,8 +27,6 @@ use std::{
     },
     thread,
     time::Instant,
-    u64,
-    vec::Vec,
 };
 
 /// Nano mainnet threshold for send and change blocks.
