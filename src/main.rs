@@ -19,7 +19,7 @@ use std::{
     convert::Infallible,
     process,
     sync::{
-        atomic::{self, AtomicBool},
+        atomic::{AtomicBool, Ordering},
         Arc,
     },
     thread,
@@ -28,9 +28,13 @@ use std::{
     vec::Vec,
 };
 
+/// Nano mainnet threshold for send and change blocks.
 const LIVE_DIFFICULTY: u64 = 0xfffffff800000000;
+
+/// Nano mainnet threshold for receive, open, and epoch blocks.
 const LIVE_RECEIVE_DIFFICULTY: u64 = 0xfffffe0000000000;
 
+/// Compute the PoW value for a given root and work nonce
 fn work_value(root: [u8; 32], work: [u8; 8]) -> u64 {
     let mut buf = [0u8; 8];
     let mut hasher = Blake2bVar::new(buf.len()).expect("Unsupported hash length");
@@ -65,7 +69,7 @@ struct WorkState {
 impl WorkState {
     fn set_task(&mut self, cond_var: &Condvar) {
         if self.callback.is_none() {
-            self.task_complete.store(true, atomic::Ordering::Relaxed);
+            self.task_complete.store(true, Ordering::Relaxed);
             if self.future_work.len() > 0 {
                 let max_range = if self.random_mode {
                     self.future_work.len()
@@ -83,6 +87,8 @@ impl WorkState {
         }
     }
 }
+
+// RPC Backend
 
 #[derive(Clone)]
 struct RpcService {
@@ -461,7 +467,7 @@ impl RpcService {
                 let queue_size = state.future_work.len();
                 let resp = json!({
                     "queue_size": format!("{}", queue_size),
-                    "generating": if state.task_complete.load(atomic::Ordering::Relaxed) {"0"} else {"1"},
+                    "generating": if state.task_complete.load(Ordering::Relaxed) {"0"} else {"1"},
                 });
                 println!("Status {}", resp);
                 Ok((StatusCode::OK, resp))
@@ -536,6 +542,7 @@ async fn main() {
                 .help("Pick a random request from the queue instead of the oldest. Increases efficiency when using multiple work servers")
         )
         .get_matches();
+
     let random_mode = args.is_present("shuffle");
     let listen_addr = args
         .value_of("listen_address")
@@ -551,6 +558,8 @@ async fn main() {
         s.parse()
             .expect("Failed to parse GPU local work size option")
     });
+
+    // Parse GPU definitions
     let gpus: Vec<Gpu> = args
         .values_of("gpu")
         .map(|x| x.collect())
@@ -586,13 +595,16 @@ async fn main() {
         eprintln!("No workers specified. Please use the --gpu or --cpu-threads flags.\nUse --help for more options.");
         process::exit(1);
     }
+
     let work_state = Arc::new((Mutex::new(WorkState::default()), Condvar::new()));
     {
         let mut state = work_state.0.lock();
-        state.task_complete.store(true, atomic::Ordering::Relaxed);
+        state.task_complete.store(true, Ordering::Relaxed);
         state.random_mode = random_mode;
     }
     let mut worker_handles = Vec::new();
+
+    // CPU worker threads
     for _ in 0..cpu_threads {
         let work_state = work_state.clone();
         let mut rng =
@@ -601,7 +613,7 @@ async fn main() {
         let mut difficulty = 0u64;
         let mut task_complete = Arc::new(AtomicBool::new(true));
         let handle = thread::spawn(move || loop {
-            if task_complete.load(atomic::Ordering::Relaxed) {
+            if task_complete.load(Ordering::Relaxed) {
                 let mut state = work_state.0.lock();
                 while state.callback.is_none() {
                     work_state.1.wait(&mut state);
@@ -644,7 +656,7 @@ async fn main() {
         let mut consecutive_gpu_errors = 0;
         let mut consecutive_gpu_invalid_work_errors = 0;
         let handle = thread::spawn(move || loop {
-            if failed || task_complete.load(atomic::Ordering::Relaxed) {
+            if failed || task_complete.load(Ordering::Relaxed) {
                 let mut state = work_state.0.lock();
                 if root != state.root {
                     failed = false;
@@ -746,11 +758,9 @@ async fn main() {
             }))
         }
     });
+
     let server = Server::bind(&listen_addr).serve(make_service);
-    println!(
-        "Configured for the live network with threshold {:x}",
-        LIVE_DIFFICULTY
-    );
-    println!("Ready to receive requests on {}", listen_addr);
+    println!("Difficulty set at {LIVE_DIFFICULTY:X}");
+    println!("Listening on {listen_addr}");
     server.await.expect("Failed to serve requests");
 }
