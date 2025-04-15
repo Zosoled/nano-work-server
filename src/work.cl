@@ -1,10 +1,17 @@
 /**
- * BLAKE2b initialization
+ * Nano PoW OpenCL kernel (BLAKE2b)
  *
- * param block: 0x01010008 (depth = 1, fanout = 1, digest byte length = 8)
- * input length: 0x28 (40 bytes)
- * digest finalization flag: 0xffffffffffffffffUL (~0)
+ * Each thread concatenates a unique nonce with the blockhash and uses the
+ * BLAKE2b hash algorithm to produces an 8-byte work result. If the result is
+ * greater than or equal to the difficulty value, it is atomically written to a
+ * global buffer to be read by the CPU.
+ *
+ * BLAKE2b initialization:
+ * Param block: 0x01010008 (depth = 1, fanout = 1, digest byte length = 8)
+ * Input length: 0x28 (40 bytes)
+ * Final block flag: 0xffffffffffffffffUL (~0)
  */
+
 enum BLAKE2B_IV {
     IV_0 = 0x6a09e667f3bcc908UL,
     IV_1 = 0xbb67ae8584caa73bUL,
@@ -16,7 +23,7 @@ enum BLAKE2B_IV {
     IV_7 = 0x5be0cd19137e2179UL,
     IV_PARAM = 0x6a09e667f2bdc900UL, // IV_0 ^ PARAM
     IV_INLEN = 0x510e527fade682f9UL, // IV_4 ^ 40
-    IV_DIGEST = 0xe07c265404be4294UL, // IV_6 ^ ~0
+    IV_FINAL = 0xe07c265404be4294UL, // IV_6 ^ ~0
 };
 
 #ifdef cl_amd_media_ops
@@ -59,12 +66,11 @@ static inline ulong blake2b(ulong const n, __constant ulong* h)
 {
     ulong16 v = {
         IV_PARAM, IV_1, IV_2, IV_3, IV_4, IV_5, IV_6, IV_7,
-        IV_0, IV_1, IV_2, IV_3, IV_INLEN, IV_5, IV_DIGEST, IV_7
+        IV_0, IV_1, IV_2, IV_3, IV_INLEN, IV_5, IV_FINAL, IV_7
     };
     ulong16 m = {
         n, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
-
     ROUND(m.s0123456789ABCDEF);
     ROUND(m.sEA489FD61C02B753);
     ROUND(m.sB8C052FDAE367194);
@@ -77,7 +83,6 @@ static inline ulong blake2b(ulong const n, __constant ulong* h)
     ROUND(m.sA2847615FB9E3CD0);
     ROUND(m.s0123456789ABCDEF);
     ROUND(m.sEA489FD61C02B753);
-
     return IV_0 ^ v.s0 ^ v.s8;
 }
 #undef G
