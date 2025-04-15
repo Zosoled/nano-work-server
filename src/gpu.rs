@@ -22,6 +22,7 @@ impl Gpu {
     ) -> Result<Gpu> {
         let mut prog_bldr = ProgramBuilder::new();
         prog_bldr.src(include_str!("work.cl"));
+
         let platforms = Platform::list();
         if platforms.len() == 0 {
             return Err("No OpenCL platforms exist (check your drivers and OpenCL setup)".into());
@@ -34,6 +35,7 @@ impl Gpu {
             )
             .into());
         }
+
         let pro_que = ProQue::builder()
             .prog_bldr(prog_bldr)
             .platform(platforms[platform_idx])
@@ -53,11 +55,13 @@ impl Gpu {
             .flags(MemFlags::new().read_only().host_write_only())
             .len(8)
             .build()?;
+
         let result = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
             .flags(MemFlags::new().write_only())
             .len(8)
             .build()?;
+
         let blockhash = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
             .flags(MemFlags::new().read_only().host_write_only())
