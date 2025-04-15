@@ -52,19 +52,19 @@ impl Gpu {
 
         let seed = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
-            .flags(MemFlags::new().read_only().host_write_only())
+            .flags(MemFlags::READ_ONLY | MemFlags::HOST_WRITE_ONLY)
             .len(8)
             .build()?;
 
         let result = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
-            .flags(MemFlags::new().write_only())
+            .flags(MemFlags::WRITE_ONLY)
             .len(8)
             .build()?;
 
         let blockhash = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
-            .flags(MemFlags::new().read_only().host_write_only())
+            .flags(MemFlags::READ_ONLY | MemFlags::HOST_WRITE_ONLY)
             .len(32)
             .build()?;
 
