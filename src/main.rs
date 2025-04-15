@@ -51,6 +51,7 @@ fn work_valid(root: [u8; 32], work: [u8; 8], difficulty: u64) -> (bool, u64) {
     (result_difficulty >= difficulty, result_difficulty)
 }
 
+#[derive(Debug)]
 enum WorkError {
     Canceled,
     Errored,
@@ -104,6 +105,7 @@ enum RpcCommand {
     Status(),
 }
 
+#[derive(Debug)]
 enum HexJsonError {
     Empty,
     InvalidHex,
