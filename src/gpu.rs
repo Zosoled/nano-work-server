@@ -122,10 +122,10 @@ impl Gpu {
         }
 
         self.result.read(&mut *out).enq()?;
-        let success = !out.iter().all(|&b| b == 0);
-        if success {
+        let found = out.iter().any(|&b| b != 0);
+        if found {
             self.reset_bufs()?;
         }
-        Ok(success)
+        Ok(found)
     }
 }
