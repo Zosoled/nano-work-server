@@ -70,19 +70,17 @@ impl Gpu {
 
         let difficulty = 0u64;
 
-        let kernel = {
-            let mut kernel_builder = pro_que.kernel_builder("work_generate");
-            kernel_builder
-                .global_work_size(threads)
-                .arg(&seed)
-                .arg(&result)
-                .arg(&blockhash)
-                .arg_named("difficulty", &difficulty);
-            if let Some(local_work_size) = local_work_size {
-                kernel_builder.local_work_size(local_work_size);
-            }
-            kernel_builder.build()?
-        };
+        let mut kernel_builder = pro_que.kernel_builder("work_generate");
+        kernel_builder
+            .global_work_size(threads)
+            .arg(&seed)
+            .arg(&result)
+            .arg(&blockhash)
+            .arg_named("difficulty", &difficulty);
+        if let Some(lws) = local_work_size {
+            kernel_builder.local_work_size(lws);
+        }
+        let kernel = kernel_builder.build()?;
 
         let mut gpu = Gpu {
             kernel,
