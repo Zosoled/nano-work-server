@@ -93,7 +93,7 @@ impl Gpu {
     }
 
     pub fn reset_bufs(&mut self) -> Result<()> {
-        self.result.write(&[0u8; 8] as &[u8]).enq()?;
+        self.result.write(&[0u8; 8][..]).enq()?;
         Ok(())
     }
 
