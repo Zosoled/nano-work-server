@@ -56,9 +56,7 @@ static inline ulong4 rotr64(ulong4 x, int shift)
         G(v.s0123, v.s5674, v.sAB89, v.sFCDE, m.s8ACE, m.s9BDF); \
     } while (0)
 
-// n: nonce
-// h: block hash
-static inline ulong blake2b(ulong const n, __constant ulong* h)
+static inline ulong blake2b(const ulong n, __constant ulong* h)
 {
     ulong16 v = {
         IV_PARAM, IV_1, IV_2, IV_3, IV_4, IV_5, IV_6, IV_7,
@@ -90,7 +88,9 @@ __kernel void work_generate(
     __constant uchar* blockhash,
     const ulong difficulty)
 {
-    const ulong nonce = *seed + get_global_id(0);
-    if (blake2b(nonce, (__constant ulong*)blockhash) >= difficulty)
-        *result = nonce;
+    const ulong nonce = *(__constant ulong*)seed + get_global_id(0);
+    const ulong hash = blake2b(nonce, (__constant ulong*)blockhash);
+    if (hash >= difficulty) {
+        atomic_xchg((__global ulong*)result, nonce);
+    }
 }
