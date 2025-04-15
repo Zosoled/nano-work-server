@@ -10,7 +10,10 @@ use futures::{
     TryFutureExt,
 };
 use gpu::Gpu;
-use hyper::{Body, Request, Response, Server, StatusCode};
+use hyper::{
+    service::{make_service_fn, service_fn},
+    Body, Request, Response, Server, StatusCode,
+};
 use parking_lot::{Condvar, Mutex};
 use rand::{Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -746,13 +749,9 @@ async fn main() {
     let service = RpcService {
         work_state: work_state.clone(),
     };
-    let make_service = hyper::service::make_service_fn(|_| {
+    let make_service = make_service_fn(move |_| {
         let service = service.clone();
-        async move {
-            Ok::<_, Infallible>(hyper::service::service_fn(move |req| {
-                service.clone().handle_request(req)
-            }))
-        }
+        async move { Ok::<_, Infallible>(service_fn(move |req| service.clone().handle_request(req))) }
     });
 
     let server = Server::bind(&listen_addr).serve(make_service);
