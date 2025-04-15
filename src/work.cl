@@ -26,21 +26,17 @@ enum BLAKE2B_IV {
     IV_FINAL = 0xe07c265404be4294UL, // IV_6 ^ ~0
 };
 
-#ifdef cl_amd_media_ops
-#pragma OPENCL EXTENSION cl_amd_media_ops : enable
 static inline ulong4 rotr64(ulong4 x, int shift)
 {
+#ifdef cl_amd_media_ops
     uint8 x8 = as_uint8(x);
     if (shift < 32)
         return as_ulong4(amd_bitalign(x8.s10325476, x8, shift));
     return as_ulong4(amd_bitalign(x8, x8.s10325476, (shift - 32)));
-}
 #else
-static inline ulong4 rotr64(ulong4 x, int shift)
-{
     return rotate(x, (ulong4)(64UL - shift));
-}
 #endif
+}
 
 #define G(a, b, c, d, x, y)    \
     do {                       \
