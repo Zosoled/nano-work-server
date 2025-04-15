@@ -1,37 +1,32 @@
 mod gpu;
 
-use std::convert::Infallible;
-use std::process;
-use std::sync::atomic::{self, AtomicBool};
-use std::sync::Arc;
-use std::thread;
-use std::time::Instant;
-use std::u64;
-use std::vec::Vec;
-
-use futures::channel::oneshot;
-use futures::future::{self, Future};
-use futures::TryFutureExt;
-
-use hyper::{Body, Request, Response, Server, StatusCode};
-
-use serde_json::{json, Value};
-
-use rand::{Rng, SeedableRng};
-
-use rand_xorshift::XorShiftRng;
-
 use blake2::Blake2bVar;
-
-use digest::{Update, VariableOutput};
-
 use byteorder::{ByteOrder, LittleEndian};
-
-use parking_lot::{Condvar, Mutex};
-
 use chrono::{DateTime, Utc};
-
+use digest::{Update, VariableOutput};
+use futures::{
+    channel::oneshot,
+    future::{self, Future},
+    TryFutureExt,
+};
 use gpu::Gpu;
+use hyper::{Body, Request, Response, Server, StatusCode};
+use parking_lot::{Condvar, Mutex};
+use rand::{Rng, SeedableRng};
+use rand_xorshift::XorShiftRng;
+use serde_json::{json, Value};
+use std::{
+    convert::Infallible,
+    process,
+    sync::{
+        atomic::{self, AtomicBool},
+        Arc,
+    },
+    thread,
+    time::Instant,
+    u64,
+    vec::Vec,
+};
 
 const LIVE_DIFFICULTY: u64 = 0xfffffff800000000;
 const LIVE_RECEIVE_DIFFICULTY: u64 = 0xfffffe0000000000;
