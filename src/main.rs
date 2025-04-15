@@ -73,7 +73,7 @@ impl WorkState {
     fn set_task(&mut self, cond_var: &Condvar) {
         if self.callback.is_none() {
             self.task_complete.store(true, Ordering::Relaxed);
-            if self.future_work.len() > 0 {
+            if !self.future_work.is_empty() {
                 let max_range = if self.random_mode {
                     self.future_work.len()
                 } else {
@@ -164,7 +164,7 @@ impl RpcService {
             .as_str()
             .and_then(|s| hex::decode(s).ok())
             .ok_or(HexJsonError::InvalidHex)?;
-        if bytes.len() == 0 {
+        if bytes.is_empty() {
             return Err(HexJsonError::Empty);
         } else if !allow_short && bytes.len() < out.len() {
             return Err(HexJsonError::TooShort);
@@ -269,7 +269,6 @@ impl RpcService {
                 "error": "Failed to deserialize JSON",
                 "hint": "count field missing"
             })),
-
             Some(json) => {
                 let count = json
                     .as_u64()
@@ -447,7 +446,7 @@ impl RpcService {
                 let duration = start.elapsed().as_millis();
                 let average = duration as u64 / count;
                 println!(
-                    "Benchmark finished in {}ms , average {}ms / sample",
+                    "Benchmark finished in {}ms (average {}ms)",
                     duration, average
                 );
                 Ok((StatusCode::OK, {
@@ -498,6 +497,8 @@ impl RpcService {
             .expect("Failed to build response"))
     }
 }
+
+// GPU work main
 
 #[tokio::main]
 async fn main() {
