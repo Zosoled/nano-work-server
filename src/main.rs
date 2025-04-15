@@ -6,7 +6,7 @@ use chrono::Utc;
 use digest::{Update, VariableOutput};
 use futures::{
     channel::oneshot,
-    future::{self, Future},
+    future::{ready, Future},
     TryFutureExt,
 };
 use gpu::Gpu;
@@ -125,7 +125,7 @@ impl RpcService {
         state.set_task(&self.work_state.1);
         callback_recv
             .map_err(|_| WorkError::Errored)
-            .and_then(|x| future::ready(x))
+            .and_then(|x| ready(x))
     }
 
     fn cancel_work(&self, root: [u8; 32]) {
