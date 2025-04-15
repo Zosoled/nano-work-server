@@ -24,8 +24,8 @@ impl Gpu {
         prog_bldr.src(include_str!("work.cl"));
 
         let platforms = Platform::list();
-        if platforms.len() == 0 {
-            return Err("No OpenCL platforms exist (check your drivers and OpenCL setup)".into());
+        if platforms.is_empty() {
+            return Err("No OpenCL platforms found".into());
         }
         if platform_idx >= platforms.len() {
             return Err(format!(
