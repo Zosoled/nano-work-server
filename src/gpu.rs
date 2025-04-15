@@ -19,7 +19,7 @@ impl Gpu {
         device_idx: usize,
         threads: usize,
         local_work_size: Option<usize>,
-    ) -> Result<Gpu> {
+    ) -> Result<Self> {
         let mut prog_bldr = ProgramBuilder::new();
         prog_bldr.src(include_str!("work.cl"));
 
