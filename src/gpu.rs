@@ -1,11 +1,8 @@
-use ocl;
-use ocl::builders::DeviceSpecifier;
-use ocl::builders::ProgramBuilder;
-use ocl::flags::MemFlags;
-use ocl::Buffer;
-use ocl::Platform;
-use ocl::ProQue;
-use ocl::Result;
+use ocl::{
+    builders::{DeviceSpecifier, ProgramBuilder},
+    flags::MemFlags,
+    Buffer, Platform, ProQue, Result,
+};
 
 use byteorder::{ByteOrder, LittleEndian};
 
