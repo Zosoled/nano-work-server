@@ -2,7 +2,7 @@ mod gpu;
 
 use blake2::Blake2bVar;
 use byteorder::{ByteOrder, LittleEndian};
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use digest::{Update, VariableOutput};
 use futures::{
     channel::oneshot,
@@ -229,18 +229,15 @@ impl RpcService {
     fn parse_difficulty_json(json: &Value) -> Result<Option<u64>, Value> {
         match json.get("difficulty") {
             None => Ok(None),
-
             Some(json) => {
                 let difficulty_str = json.as_str().ok_or(json!({
                     "error": "Failed to deserialize JSON",
                     "hint": "Expecting a hex string for difficulty",
                 }))?;
-
                 let difficulty = u64::from_str_radix(difficulty_str, 16).map_err(|_| json!({
                     "error": "Failed to deserialize JSON",
                     "hint": "Threshold not a valid unsigned long (u64). Example: 'ffffffc000000000'",
                 }))?;
-
                 Ok(Some(difficulty))
             }
         }
@@ -249,7 +246,6 @@ impl RpcService {
     fn parse_multiplier_json(json: &Value) -> Result<Option<f64>, Value> {
         match json.get("multiplier") {
             None => Ok(None),
-
             Some(json) => {
                 let multiplier = json
                     .as_str()
@@ -344,7 +340,7 @@ impl RpcService {
         let start = Instant::now();
         match command {
             RpcCommand::WorkGenerate(root, difficulty, multiplier) => {
-                let now: DateTime<Utc> = Utc::now();
+                let now = Utc::now();
                 let _ = println!(
                     "{} Received work for {}",
                     now.format("%T"),
@@ -358,7 +354,7 @@ impl RpcService {
                     Ok(mut work) => {
                         let result_difficulty = work_value(root, work);
                         let result_multiplier = self.to_multiplier(result_difficulty);
-                        let now: DateTime<Utc> = Utc::now();
+                        let now = Utc::now();
                         let _ = println!(
                             "{} Generated for {} in {}ms for difficulty {:x}",
                             now.format("%T"),
