@@ -2,7 +2,10 @@ use crate::gpu::Gpu;
 
 use chrono::Utc;
 use futures::{channel::oneshot, future::ready, Future, TryFutureExt};
-use hyper::{Body, Request, Response, Server, StatusCode};
+use hyper::{
+    service::{make_service_fn, service_fn},
+    Body, Request, Response, Server, StatusCode,
+};
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -19,12 +22,18 @@ use std::{
 };
 
 /// Nano mainnet threshold for send and change blocks.
-pub const LIVE_DIFFICULTY: u64 = 0xfffffff800000000;
+const LIVE_DIFFICULTY: u64 = 0xfffffff800000000;
 /// Nano mainnet threshold for receive, open, and epoch blocks.
-pub const LIVE_RECEIVE_DIFFICULTY: u64 = 0xfffffe0000000000;
+const LIVE_RECEIVE_DIFFICULTY: u64 = 0xfffffe0000000000;
 
-/// Work queue state, now private to this module/server.
-pub struct WorkState {
+#[derive(Debug)]
+enum WorkError {
+    Canceled,
+    Errored,
+}
+
+#[derive(Default)]
+struct WorkState {
     root: [u8; 32],
     difficulty: u64,
     callback: Option<oneshot::Sender<Result<[u8; 8], WorkError>>>,
@@ -34,31 +43,17 @@ pub struct WorkState {
     future_work: Vec<([u8; 32], u64, oneshot::Sender<Result<[u8; 8], WorkError>>)>,
 }
 
-impl Default for WorkState {
-    fn default() -> Self {
-        Self {
-            root: [0u8; 32],
-            difficulty: 0,
-            callback: None,
-            task_complete: Arc::new(AtomicBool::new(true)),
-            unsuccessful_workers: 0,
-            random_mode: false,
-            future_work: Vec::new(),
-        }
-    }
-}
-
 impl WorkState {
     fn set_task(&mut self, cond_var: &Condvar) {
         if self.callback.is_none() {
             self.task_complete.store(true, Ordering::Relaxed);
             if !self.future_work.is_empty() {
-                let idx = if self.random_mode {
-                    rand::thread_rng().gen_range(0..self.future_work.len())
+                let i = if self.random_mode {
+                    thread_rng().gen_range(0..self.future_work.len())
                 } else {
                     0
                 };
-                let (root, difficulty, callback) = self.future_work.remove(idx);
+                let (root, difficulty, callback) = self.future_work.remove(i);
                 self.root = root;
                 self.difficulty = difficulty;
                 self.callback = Some(callback);
@@ -69,12 +64,7 @@ impl WorkState {
     }
 }
 
-#[derive(Debug)]
-pub enum WorkError {
-    Canceled,
-    Errored,
-}
-
+/// Compute the PoW value for a given root and work nonce
 fn work_value(root: [u8; 32], work: [u8; 8]) -> u64 {
     use blake2::Blake2bVar;
     use byteorder::{ByteOrder, LittleEndian};
@@ -636,16 +626,13 @@ pub async fn start_server(
                     Err(err) => {
                         eprintln!("Error computing work on GPU {}: {:?}", gpu_i, err);
                         if let Err(err) = gpu.reset_bufs() {
-                            eprintln!(
-                                "Failed to reset GPU {}'s buffers, abandoning it for this work: {:?}", gpu_i, err,
-                            );
+                            eprintln!("Failed to reset GPU {gpu_i}'s buffers, abandoning it for this work: {err:?}");
                             failed = true;
                         }
                         consecutive_gpu_errors += 1;
                         if consecutive_gpu_errors >= 3 {
                             eprintln!(
-                                "3 consecutive GPU {} errors, abandoning it for this work",
-                                gpu_i,
+                                "3 consecutive GPU {gpu_i} errors, abandoning it for this work"
                             );
                             failed = true;
                         }
@@ -658,20 +645,13 @@ pub async fn start_server(
     let service = RpcService {
         work_state: work_state.clone(),
     };
-    let make_service = hyper::service::make_service_fn(move |_| {
+    let make_service = make_service_fn(move |_| {
         let service = service.clone();
-        async move {
-            Ok::<_, Infallible>(hyper::service::service_fn(move |req| {
-                service.clone().handle_request(req)
-            }))
-        }
+        async move { Ok::<_, Infallible>(service_fn(move |req| service.clone().handle_request(req))) }
     });
     let server = Server::bind(&listen_addr).serve(make_service);
 
-    println!(
-        "Configured for the live network with threshold {:x}",
-        LIVE_DIFFICULTY
-    );
-    println!("Ready to receive requests on {}", listen_addr);
+    println!("Difficulty set at {LIVE_DIFFICULTY:X}");
+    println!("Listening on {listen_addr}");
     server.await.expect("Failed to serve requests");
 }
