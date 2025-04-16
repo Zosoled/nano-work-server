@@ -37,7 +37,7 @@ struct WorkState {
     root: [u8; 32],
     difficulty: u64,
     callback: Option<oneshot::Sender<Result<[u8; 8], WorkError>>>,
-    task_complete: Arc<AtomicBool>,
+    task_working: Arc<AtomicBool>,
     unsuccessful_workers: usize,
     random_mode: bool,
     future_work: Vec<([u8; 32], u64, oneshot::Sender<Result<[u8; 8], WorkError>>)>,
@@ -46,7 +46,7 @@ struct WorkState {
 impl WorkState {
     fn set_task(&mut self, cond_var: &Condvar) {
         if self.callback.is_none() {
-            self.task_complete.store(true, Ordering::Relaxed);
+            self.task_working.store(false, Ordering::Relaxed);
             if !self.future_work.is_empty() {
                 let i = if self.random_mode {
                     thread_rng().gen_range(0..self.future_work.len())
@@ -57,7 +57,7 @@ impl WorkState {
                 self.root = root;
                 self.difficulty = difficulty;
                 self.callback = Some(callback);
-                self.task_complete = Arc::new(AtomicBool::new(false));
+                self.task_working = Arc::new(AtomicBool::new(true));
                 cond_var.notify_all();
             }
         }
@@ -349,7 +349,7 @@ impl RpcService {
                         let result_multiplier = self.to_multiplier(result_difficulty);
                         let now = Utc::now();
                         let _ = println!(
-                            "{} Generated for {} in {}ms for difficulty {:x}",
+                            "{} Generated for {} in {}ms for difficulty {:X}",
                             now.format("%T"),
                             hex::encode_upper(&root),
                             start.elapsed().as_millis(),
@@ -361,7 +361,7 @@ impl RpcService {
                             StatusCode::OK,
                             json!({
                                 "work": hex::encode(&work),
-                                "difficulty": format!("{:x}", result_difficulty),
+                                "difficulty": format!("{:X}", result_difficulty),
                                 "multiplier": format!("{}", result_multiplier),
                             }),
                         ))
@@ -397,7 +397,7 @@ impl RpcService {
                 let mut result = json!({
                     "valid_all": if valid_all { "1" } else { "0" },
                     "valid_receive": if valid_receive { "1" } else { "0" },
-                    "difficulty": format!("{:x}", result_difficulty),
+                    "difficulty": format!("{:X}", result_difficulty),
                     "multiplier": format!("{}", self.to_multiplier(result_difficulty)),
                 });
                 if difficulty.is_some() {
@@ -415,8 +415,7 @@ impl RpcService {
                 };
                 let multiplier_l = self.to_multiplier(difficulty_l);
                 let _ = println!(
-                    "Benchmarking {} samples at difficulty {:x} ({}x)",
-                    count, difficulty_l, multiplier_l,
+                    "Benchmarking {count} samples at difficulty {difficulty_l:X} ({multiplier_l}x)"
                 );
                 let mut roots: Vec<[u8; 32]> = Vec::new();
                 roots.reserve(count as usize);
@@ -436,13 +435,10 @@ impl RpcService {
                 }
                 let duration = start.elapsed().as_millis();
                 let average = duration as u64 / count;
-                println!(
-                    "Benchmark finished in {}ms (average {}ms)",
-                    duration, average
-                );
+                println!("Benchmark finished in {duration}ms (average {average}ms)");
                 Ok((StatusCode::OK, {
                     json!({
-                        "difficulty": format!("{:x}", difficulty_l),
+                        "difficulty": format!("{:X}", difficulty_l),
                         "multiplier": format!("{}", multiplier_l),
                         "count": format!("{}", count),
                         "duration": format!("{}", duration),
@@ -456,9 +452,9 @@ impl RpcService {
                 let queue_size = state.future_work.len();
                 let resp = json!({
                     "queue_size": format!("{}", queue_size),
-                    "generating": if state.task_complete.load(Ordering::Relaxed) {"0"} else {"1"},
+                    "generating": if state.task_working.load(Ordering::Relaxed) {"1"} else {"0"},
                 });
-                println!("Status {}", resp);
+                println!("Status {resp}");
                 Ok((StatusCode::OK, resp))
             }
         }
@@ -500,7 +496,7 @@ pub async fn start_server(
     let work_state = Arc::new((Mutex::new(WorkState::default()), Condvar::new()));
     {
         let mut state = work_state.0.lock();
-        state.task_complete.store(true, Ordering::Relaxed);
+        state.task_working.store(false, Ordering::Relaxed);
         state.random_mode = random_mode;
     }
 
@@ -511,16 +507,16 @@ pub async fn start_server(
         thread::spawn(move || {
             let mut root = [0u8; 32];
             let mut difficulty = 0u64;
-            let mut task_complete = Arc::new(AtomicBool::new(true));
+            let mut task_working = Arc::new(AtomicBool::new(false));
             loop {
-                if task_complete.load(Ordering::Relaxed) {
+                if !task_working.load(Ordering::Relaxed) {
                     let mut state = work_state.0.lock();
                     while state.callback.is_none() {
                         work_state.1.wait(&mut state);
                     }
                     root = state.root;
                     difficulty = state.difficulty;
-                    task_complete = state.task_complete.clone();
+                    task_working = state.task_working.clone();
                 }
                 let mut out: [u8; 8] = rng.gen();
                 for _ in 0..(1 << 18) {
@@ -553,11 +549,11 @@ pub async fn start_server(
                 XorShiftRng::from_rng(thread_rng()).expect("Failed to create XorShiftRng");
             let mut root = [0u8; 32];
             let mut difficulty = 0u64;
-            let mut task_complete = Arc::new(AtomicBool::new(true));
+            let mut task_working = Arc::new(AtomicBool::new(false));
             let mut consecutive_gpu_errors = 0;
             let mut consecutive_gpu_invalid_work_errors = 0;
             loop {
-                if failed || task_complete.load(Ordering::Relaxed) {
+                if failed || !task_working.load(Ordering::Relaxed) {
                     let mut state = work_state.0.lock();
                     if root != state.root {
                         failed = false;
@@ -577,15 +573,12 @@ pub async fn start_server(
                     }
                     root = state.root;
                     difficulty = state.difficulty;
-                    task_complete = state.task_complete.clone();
+                    task_working = state.task_working.clone();
                     if failed {
                         state.unsuccessful_workers -= 1;
                     }
                     if let Err(err) = gpu.set_task(&root, difficulty) {
-                        eprintln!(
-                            "Failed to set GPU {}'s task, abandoning it for this work: {:?}",
-                            gpu_i, err
-                        );
+                        eprintln!("Failed to set GPU {gpu_i}'s task, abandoning it for this work: {err:?}");
                         failed = true;
                         continue;
                     }
@@ -615,7 +608,7 @@ pub async fn start_server(
                             );
                             consecutive_gpu_invalid_work_errors += 1;
                             if consecutive_gpu_invalid_work_errors >= 3 {
-                                eprintln!("GPU {} returned invalid work 3 consecutive times, abandoning it for this work", gpu_i);
+                                eprintln!("GPU {gpu_i} returned invalid work 3 consecutive times, abandoning it for this work");
                                 failed = true;
                             } else {
                                 consecutive_gpu_errors += 1;
@@ -624,7 +617,7 @@ pub async fn start_server(
                     }
                     Ok(false) => consecutive_gpu_errors = 0,
                     Err(err) => {
-                        eprintln!("Error computing work on GPU {}: {:?}", gpu_i, err);
+                        eprintln!("Error computing work on GPU {gpu_i}: {err:?}");
                         if let Err(err) = gpu.reset_bufs() {
                             eprintln!("Failed to reset GPU {gpu_i}'s buffers, abandoning it for this work: {err:?}");
                             failed = true;
