@@ -4,7 +4,7 @@ use chrono::Utc;
 use futures::{channel::oneshot, future::ready, Future, TryFutureExt};
 use hyper::{
     service::{make_service_fn, service_fn},
-    Body, Request, Response, Server, StatusCode,
+    Body, Method, Request, Response, Server, StatusCode,
 };
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng, SeedableRng};
@@ -48,7 +48,7 @@ impl WorkState {
         if self.callback.is_none() {
             self.task_working.store(false, Ordering::Relaxed);
             if !self.future_work.is_empty() {
-                let i = if self.random_mode {
+                let i: usize = if self.random_mode {
                     thread_rng().gen_range(0..self.future_work.len())
                 } else {
                     0
@@ -461,7 +461,7 @@ impl RpcService {
     }
 
     async fn handle_request(self, mut req: Request<Body>) -> hyper::Result<Response<Body>> {
-        let (status, body) = if *req.method() == hyper::Method::POST {
+        let (status, body) = if *req.method() == Method::POST {
             let self_copy = self.clone();
             let body = hyper::body::to_bytes(req.body_mut()).await?;
             self_copy.process_req(body.as_ref()).await?
