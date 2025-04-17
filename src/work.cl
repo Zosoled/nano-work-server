@@ -11,7 +11,6 @@
  * Input length: 0x28 (40 bytes)
  * Final block flag: 0xffffffffffffffffUL (~0)
  */
-
 enum BLAKE2B_IV {
     IV_0 = 0x6a09e667f3bcc908UL,
     IV_1 = 0xbb67ae8584caa73bUL,
@@ -25,7 +24,6 @@ enum BLAKE2B_IV {
     IV_INLEN = 0x510e527fade682f9UL, // IV_4 ^ 40
     IV_FINAL = 0xe07c265404be4294UL, // IV_6 ^ ~0
 };
-
 static inline ulong4 rotr64(ulong4 x, int shift)
 {
 #ifdef cl_amd_media_ops
@@ -37,7 +35,6 @@ static inline ulong4 rotr64(ulong4 x, int shift)
     return rotate(x, (ulong4)(64UL - shift));
 #endif
 }
-
 #define G(a, b, c, d, x, y)    \
     do {                       \
         a += b + x;            \
@@ -49,13 +46,11 @@ static inline ulong4 rotr64(ulong4 x, int shift)
         c += d;                \
         b = rotr64(b ^ c, 63); \
     } while (0)
-
 #define ROUND(m)                                                 \
     do {                                                         \
         G(v.s0123, v.s4567, v.s89AB, v.sCDEF, m.s0246, m.s1357); \
         G(v.s0123, v.s5674, v.sAB89, v.sFCDE, m.s8ACE, m.s9BDF); \
     } while (0)
-
 static inline ulong blake2b(const ulong n, __constant ulong* h)
 {
     ulong16 v = {
@@ -81,7 +76,6 @@ static inline ulong blake2b(const ulong n, __constant ulong* h)
 }
 #undef G
 #undef ROUND
-
 __kernel void work_generate(
     __constant uchar* seed,
     __global uchar* result,
