@@ -79,8 +79,8 @@ fn work_value(root: [u8; 32], work: [u8; 8]) -> u64 {
 
 #[inline]
 fn work_valid(root: [u8; 32], work: [u8; 8], difficulty: u64) -> (bool, u64) {
-    let result_difficulty = work_value(root, work);
-    (result_difficulty >= difficulty, result_difficulty)
+    let work_difficulty = work_value(root, work);
+    (work_difficulty >= difficulty, work_difficulty)
 }
 
 enum RpcCommand {
@@ -345,8 +345,8 @@ impl RpcService {
                 };
                 match self.generate_work(root, difficulty).await {
                     Ok(mut work) => {
-                        let result_difficulty = work_value(root, work);
-                        let result_multiplier = self.to_multiplier(result_difficulty);
+                        let work_difficulty = work_value(root, work);
+                        let work_multiplier = self.to_multiplier(work_difficulty);
                         let now = Utc::now();
                         let _ = println!(
                             "{} Generated for {} in {}ms for difficulty {:X}",
@@ -361,8 +361,8 @@ impl RpcService {
                             StatusCode::OK,
                             json!({
                                 "work": hex::encode(&work),
-                                "difficulty": format!("{:X}", result_difficulty),
-                                "multiplier": format!("{}", result_multiplier),
+                                "difficulty": format!("{:X}", work_difficulty),
+                                "multiplier": format!("{}", work_multiplier),
                             }),
                         ))
                     }
@@ -391,14 +391,14 @@ impl RpcService {
                     None => difficulty.unwrap_or(LIVE_DIFFICULTY),
                     Some(multiplier) => self.from_multiplier(multiplier),
                 };
-                let (valid, result_difficulty) = work_valid(root, work, difficulty_l);
+                let (valid, work_difficulty) = work_valid(root, work, difficulty_l);
                 let (valid_all, _) = work_valid(root, work, LIVE_DIFFICULTY);
                 let (valid_receive, _) = work_valid(root, work, LIVE_RECEIVE_DIFFICULTY);
                 let mut result = json!({
                     "valid_all": if valid_all { "1" } else { "0" },
                     "valid_receive": if valid_receive { "1" } else { "0" },
-                    "difficulty": format!("{:X}", result_difficulty),
-                    "multiplier": format!("{}", self.to_multiplier(result_difficulty)),
+                    "difficulty": format!("{:X}", work_difficulty),
+                    "multiplier": format!("{}", self.to_multiplier(work_difficulty)),
                 });
                 if difficulty.is_some() {
                     result
@@ -518,19 +518,19 @@ pub async fn start_server(
                     difficulty = state.difficulty;
                     task_working = state.task_working.clone();
                 }
-                let mut out: [u8; 8] = rng.gen();
+                let mut work: [u8; 8] = rng.gen();
                 for _ in 0..(1 << 18) {
-                    if work_valid(root, out, difficulty).0 {
+                    if work_valid(root, work, difficulty).0 {
                         let mut state = work_state.0.lock();
                         if root == state.root {
                             if let Some(callback) = state.callback.take() {
-                                let _ = callback.send(Ok(out));
+                                let _ = callback.send(Ok(work));
                                 state.set_task(&work_state.1);
                             }
                         }
                         break;
                     }
-                    for byte in out.iter_mut() {
+                    for byte in work.iter_mut() {
                         *byte = byte.wrapping_add(1);
                         if *byte != 0 {
                             break;
@@ -586,14 +586,14 @@ pub async fn start_server(
                     consecutive_gpu_errors = 0;
                 }
                 let attempt = rng.gen();
-                let mut out = [0u8; 8];
-                match gpu.run(&mut out, attempt) {
+                let mut work = [0u8; 8];
+                match gpu.run(attempt, &mut work) {
                     Ok(true) => {
-                        if work_valid(root, out, difficulty).0 {
+                        if work_valid(root, work, difficulty).0 {
                             let mut state = work_state.0.lock();
                             if root == state.root {
                                 if let Some(callback) = state.callback.take() {
-                                    let _ = callback.send(Ok(out));
+                                    let _ = callback.send(Ok(work));
                                     state.set_task(&work_state.1);
                                 }
                             }
@@ -603,7 +603,7 @@ pub async fn start_server(
                             eprintln!(
                                 "GPU {} returned invalid work {} for root {}",
                                 gpu_i,
-                                hex::encode(&out),
+                                hex::encode(&work),
                                 hex::encode_upper(&root),
                             );
                             consecutive_gpu_invalid_work_errors += 1;

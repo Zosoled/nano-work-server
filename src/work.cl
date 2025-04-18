@@ -78,13 +78,16 @@ static inline ulong blake2b(const ulong n, __constant ulong* h)
 #undef ROUND
 __kernel void work_generate(
     __constant uchar* seed,
-    __global uchar* result,
     __constant uchar* blockhash,
+    __global uchar* work,
     const ulong difficulty)
 {
+    if (*(volatile __global ulong*)work != 0) {
+        return;
+    }
     const ulong nonce = *(__constant ulong*)seed + get_global_id(0);
     const ulong hash = blake2b(nonce, (__constant ulong*)blockhash);
     if (hash >= difficulty) {
-        atomic_xchg((__global ulong*)result, nonce);
+        atomic_xchg((__global ulong*)work, nonce);
     }
 }

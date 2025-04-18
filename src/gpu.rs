@@ -9,8 +9,8 @@ use byteorder::{ByteOrder, LittleEndian};
 pub struct Gpu {
     kernel: ocl::Kernel,
     seed: Buffer<u8>,
-    result: Buffer<u8>,
     blockhash: Buffer<u8>,
+    work: Buffer<u8>,
 }
 
 impl Gpu {
@@ -56,16 +56,16 @@ impl Gpu {
             .len(8)
             .build()?;
 
-        let result = Buffer::<u8>::builder()
-            .queue(pro_que.queue().clone())
-            .flags(MemFlags::WRITE_ONLY)
-            .len(8)
-            .build()?;
-
         let blockhash = Buffer::<u8>::builder()
             .queue(pro_que.queue().clone())
             .flags(MemFlags::READ_ONLY | MemFlags::HOST_WRITE_ONLY)
             .len(32)
+            .build()?;
+
+        let work = Buffer::<u8>::builder()
+            .queue(pro_que.queue().clone())
+            .flags(MemFlags::WRITE_ONLY)
+            .len(8)
             .build()?;
 
         let difficulty = 0u64;
@@ -77,23 +77,23 @@ impl Gpu {
         kernel_builder
             .global_work_size(threads)
             .arg(&seed)
-            .arg(&result)
             .arg(&blockhash)
+            .arg(&work)
             .arg_named("difficulty", &difficulty);
         let kernel = kernel_builder.build()?;
 
         let mut gpu = Gpu {
             kernel,
             seed,
-            result,
             blockhash,
+            work,
         };
         gpu.reset_bufs()?;
         Ok(gpu)
     }
 
     pub fn reset_bufs(&mut self) -> Result<()> {
-        self.result.write(&[0u8; 8][..]).enq()?;
+        self.work.write(&[0u8; 8][..]).enq()?;
         Ok(())
     }
 
@@ -104,23 +104,23 @@ impl Gpu {
         Ok(())
     }
 
-    pub fn run(&mut self, out: &mut [u8], seed: u64) -> Result<bool> {
+    pub fn run(&mut self, seed: u64, work: &mut [u8]) -> Result<bool> {
         let mut seed_bytes = [0u8; 8];
         LittleEndian::write_u64(&mut seed_bytes, seed);
         self.seed.write(&seed_bytes as &[u8]).enq()?;
-        debug_assert!(out.iter().all(|&b| b == 0));
+        debug_assert!(work.iter().all(|&b| b == 0));
         debug_assert!({
-            let mut result = [0u8; 8];
-            self.result.read(&mut result as &mut [u8]).enq()?;
-            result.iter().all(|&b| b == 0)
+            let mut work_check = [0u8; 8];
+            self.work.read(&mut work_check as &mut [u8]).enq()?;
+            work.iter().all(|&b| b == 0)
         });
 
         unsafe {
             self.kernel.enq()?;
         }
 
-        self.result.read(&mut *out).enq()?;
-        let found = out.iter().any(|&b| b != 0);
+        self.work.read(&mut *work).enq()?;
+        let found = work.iter().any(|&b| b != 0);
         if found {
             self.reset_bufs()?;
         }
