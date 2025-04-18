@@ -97,6 +97,6 @@ __kernel void work_generate(
     const ulong nonce = *(__constant ulong*)seed + get_global_id(0);
     const ulong hash = blake2b(nonce, (__constant ulong*)blockhash);
     if (hash >= difficulty) {
-        atomic_exchange((volatile __global atomic_ulong*)work, nonce);
+        *((__global ulong*)work) = nonce;
     }
 }
