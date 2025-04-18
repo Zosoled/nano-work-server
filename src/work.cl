@@ -52,11 +52,11 @@ static inline ulong4 rotr64(ulong4 v, uint i)
         b = rotr64(b ^ c, 63); \
     } while (0)
 
-#define ROUND(m)                                                 \
-    do {                                                         \
-        G(v.s0123, v.s4567, v.s89AB, v.sCDEF, m.s0246, m.s1357); \
-        G(v.s0123, v.s5674, v.sAB89, v.sFCDE, m.s8ACE, m.s9BDF); \
-    } while (0)
+static inline void ROUND(ulong16* v, ulong16 m)
+{
+    G((*v).s0123, (*v).s4567, (*v).s89AB, (*v).sCDEF, m.s0246, m.s1357);
+    G((*v).s0123, (*v).s5674, (*v).sAB89, (*v).sFCDE, m.s8ACE, m.s9BDF);
+}
 
 static inline ulong blake2b(const ulong n, __constant ulong* h)
 {
@@ -67,18 +67,18 @@ static inline ulong blake2b(const ulong n, __constant ulong* h)
     ulong16 m = {
         n, h[0], h[1], h[2], h[3], 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
-    ROUND(m.s0123456789ABCDEF);
-    ROUND(m.sEA489FD61C02B753);
-    ROUND(m.sB8C052FDAE367194);
-    ROUND(m.s7931DCBE265A40F8);
-    ROUND(m.s905724AFE1BC683D);
-    ROUND(m.s2C6A0B834D75FE19);
-    ROUND(m.sC51FED4A0763928B);
-    ROUND(m.sDB7EC13950F4862A);
-    ROUND(m.s6FE9B308C2D714A5);
-    ROUND(m.sA2847615FB9E3CD0);
-    ROUND(m.s0123456789ABCDEF);
-    ROUND(m.sEA489FD61C02B753);
+    ROUND(&v, m.s0123456789ABCDEF);
+    ROUND(&v, m.sEA489FD61C02B753);
+    ROUND(&v, m.sB8C052FDAE367194);
+    ROUND(&v, m.s7931DCBE265A40F8);
+    ROUND(&v, m.s905724AFE1BC683D);
+    ROUND(&v, m.s2C6A0B834D75FE19);
+    ROUND(&v, m.sC51FED4A0763928B);
+    ROUND(&v, m.sDB7EC13950F4862A);
+    ROUND(&v, m.s6FE9B308C2D714A5);
+    ROUND(&v, m.sA2847615FB9E3CD0);
+    ROUND(&v, m.s0123456789ABCDEF);
+    ROUND(&v, m.sEA489FD61C02B753);
     return IV_0 ^ v.s0 ^ v.s8;
 }
 
