@@ -585,7 +585,7 @@ pub async fn start_server(
                     failed = false;
                     consecutive_gpu_errors = 0;
                 }
-                let attempt = rng.gen();
+                let attempt: u64 = rng.gen();
                 let mut work = [0u8; 8];
                 match gpu.run(attempt, &mut work) {
                     Ok(true) => {
