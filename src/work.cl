@@ -55,15 +55,15 @@ static inline ulong4 rotr64(ulong4 v, uint i)
 
 #define ROUND(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, mA, mB, mC, mD, mE, mF) \
     do {                                                                      \
-        G(v0, v4, v8, v12, m0, m1);                                           \
-        G(v1, v5, v9, v13, m2, m3);                                           \
-        G(v2, v6, v10, v14, m4, m5);                                          \
-        G(v3, v7, v11, v15, m6, m7);                                          \
+        G(v0, v4, v8, v12, m##m0, m##m1);                                     \
+        G(v1, v5, v9, v13, m##m2, m##m3);                                     \
+        G(v2, v6, v10, v14, m##m4, m##m5);                                    \
+        G(v3, v7, v11, v15, m##m6, m##m7);                                    \
                                                                               \
-        G(v0, v5, v10, v15, m8, m9);                                          \
-        G(v1, v6, v11, v12, mA, mB);                                          \
-        G(v2, v7, v8, v13, mC, mD);                                           \
-        G(v3, v4, v9, v14, mE, mF);                                           \
+        G(v0, v5, v10, v15, m##m8, m##m9);                                    \
+        G(v1, v6, v11, v12, m##mA, m##mB);                                    \
+        G(v2, v7, v8, v13, m##mC, m##mD);                                     \
+        G(v3, v4, v9, v14, m##mE, m##mF);                                     \
     } while (0)
 
 static inline ulong4 blake2b(const ulong4 n, __constant ulong* h)
@@ -129,6 +129,7 @@ __kernel void nano_work(
 {
     const ulong nonce = *seed + get_global_id(0);
     const ulong4 m0 = (ulong4)(nonce, nonce | 0x4000000000000000, nonce | 0x8000000000000000, nonce | 0xC000000000000000);
+
     const ulong4 result = blake2b(nonce, item_a);
     if (result.s0 >= difficulty)
         *result_a = m0.s0;
