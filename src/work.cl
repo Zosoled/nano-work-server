@@ -29,6 +29,7 @@ enum BLAKE2B_IV {
 static inline ulong4 rotr64(ulong4 v, uint i)
 {
 #ifdef cl_amd_media_ops
+#pragma OPENCL EXTENSION cl_amd_media_ops : enable
     uint8 v8 = as_uint8(v);
     if (i < 32) {
         return as_ulong4(amd_bitalign(v8.s10325476, v8, i));
