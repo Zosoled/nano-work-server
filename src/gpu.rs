@@ -106,7 +106,7 @@ impl Gpu {
 
     pub fn run(&mut self, seed: u64, work: &mut [u8]) -> Result<bool> {
         let mut seed_bytes = [0u8; 8];
-        LittleEndian::write_u64(&mut seed_bytes, seed & 0x3fffffffffffffff);
+        LittleEndian::write_u64(&mut seed_bytes, seed & 0x7fffffffffffffff);
         self.seed.write(&seed_bytes as &[u8]).enq()?;
         debug_assert!(work.iter().all(|&b| b == 0));
         debug_assert!({
