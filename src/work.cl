@@ -36,8 +36,8 @@ static inline ulong rotr64(ulong v, char i)
     }
 #else
     return rotate(v, (ulong)(64UL - i));
-}
 #endif
+}
 
 #define G(a, b, c, d, x, y)    \
     do {                       \
