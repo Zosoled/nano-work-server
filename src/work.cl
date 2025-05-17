@@ -48,25 +48,38 @@ static inline ulong rotr64(ulong v, char i)
 
 #define ROUND(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, mA, mB, mC, mD, mE, mF) \
     do {                                                                      \
-        G(v[0], v[4], v[8], v[12], m0, m1);                                   \
-        G(v[1], v[5], v[9], v[13], m2, m3);                                   \
-        G(v[2], v[6], v[10], v[14], m4, m5);                                  \
-        G(v[3], v[7], v[11], v[15], m6, m7);                                  \
+        G(v0, v4, v8, vC, m0, m1);                                            \
+        G(v1, v5, v9, vD, m2, m3);                                            \
+        G(v2, v6, vA, vE, m4, m5);                                            \
+        G(v3, v7, vB, vF, m6, m7);                                            \
                                                                               \
-        G(v[0], v[5], v[10], v[15], m8, m9);                                  \
-        G(v[1], v[6], v[11], v[12], mA, mB);                                  \
-        G(v[2], v[7], v[8], v[13], mC, mD);                                   \
-        G(v[3], v[4], v[9], v[14], mE, mF);                                   \
+        G(v0, v5, vA, vF, m8, m9);                                            \
+        G(v1, v6, vB, vC, mA, mB);                                            \
+        G(v2, v7, v8, vD, mC, mD);                                            \
+        G(v3, v4, v9, vE, mE, mF);                                            \
     } while (0)
 
 // n: nonce
 // h: block hash
 static inline ulong blake2b(ulong const n, __constant ulong* h)
 {
-    ulong v[16] = {
-        IV_PARAM, IV_1, IV_2, IV_3, IV_4, IV_5, IV_6, IV_7,
-        IV_0, IV_1, IV_2, IV_3, IV_INLEN, IV_5, IV_FINAL, IV_7
-    };
+    ulong v0 = IV_PARAM;
+    ulong v1 = IV_1;
+    ulong v2 = IV_2;
+    ulong v3 = IV_3;
+    ulong v4 = IV_4;
+    ulong v5 = IV_5;
+    ulong v6 = IV_6;
+    ulong v7 = IV_7;
+    ulong v8 = IV_0;
+    ulong v9 = IV_1;
+    ulong vA = IV_2;
+    ulong vB = IV_3;
+    ulong vC = IV_INLEN;
+    ulong vD = IV_5;
+    ulong vE = IV_FINAL;
+    ulong vF = IV_7;
+
     ulong m0 = n;
     ulong m1 = h[0];
     ulong m2 = h[1];
@@ -86,7 +99,7 @@ static inline ulong blake2b(ulong const n, __constant ulong* h)
     ROUND(m0, m1, m2, m3, m4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     ROUND(0, 0, m4, 0, 0, 0, 0, 0, m1, 0, m0, m2, 0, 0, 0, m3);
 
-    return IV_0 ^ v[0] ^ v[8];
+    return IV_0 ^ v0 ^ v8;
 }
 #undef G
 #undef ROUND
