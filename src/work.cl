@@ -90,13 +90,13 @@ static inline ulong blake2b(ulong const n, __constant ulong* h)
 #undef ROUND
 
 __kernel void work_generate(
-    __global ulong* work,
-    __constant ulong* seed,
-    __constant ulong* hash,
+    __global uchar* work,
+    __constant uchar* seed,
+    __constant uchar* hash,
     const ulong difficulty)
 {
-    const ulong nonce = *seed + get_global_id(0);
-    if (blake2b(nonce, hash) >= difficulty) {
-        *work = nonce;
+    const ulong nonce = *((__constant ulong*)seed) + get_global_id(0);
+    if (blake2b(nonce, (__constant ulong*)hash) >= difficulty) {
+        *((__global ulong*)work) = nonce;
     }
 }
