@@ -89,11 +89,14 @@ static inline ulong blake2b(ulong const n, __constant ulong* h)
 #undef G
 #undef ROUND
 
-__kernel void nano_work(__constant ulong* attempt, __global ulong* result_a,
-    __constant ulong* item_a, const ulong difficulty)
+__kernel void work_generate(
+    __global ulong* work,
+    __constant ulong* seed,
+    __constant ulong* hash,
+    const ulong difficulty)
 {
-    const ulong attempt_l = *attempt + get_global_id(0);
-    if (blake2b(attempt_l, item_a) >= difficulty) {
-        *result_a = attempt_l;
+    const ulong nonce = *seed + get_global_id(0);
+    if (blake2b(nonce, hash) >= difficulty) {
+        *work = nonce;
     }
 }
