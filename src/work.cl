@@ -51,18 +51,17 @@ static inline ulong rotr64(ulong v, char i)
         b = rotr64(b ^ c, 63); \
     } while (0)
 
-#define ROUND(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, m10, m11, m12, m13, m14, \
-    m15)                                                                       \
-    do {                                                                       \
-        G(v[0], v[4], v[8], v[12], m0, m1);                                    \
-        G(v[1], v[5], v[9], v[13], m2, m3);                                    \
-        G(v[2], v[6], v[10], v[14], m4, m5);                                   \
-        G(v[3], v[7], v[11], v[15], m6, m7);                                   \
-                                                                               \
-        G(v[0], v[5], v[10], v[15], m8, m9);                                   \
-        G(v[1], v[6], v[11], v[12], m10, m11);                                 \
-        G(v[2], v[7], v[8], v[13], m12, m13);                                  \
-        G(v[3], v[4], v[9], v[14], m14, m15);                                  \
+#define ROUND(m0, m1, m2, m3, m4, m5, m6, m7, m8, m9, mA, mB, mC, mD, mE, mF) \
+    do {                                                                      \
+        G(v[0], v[4], v[8], v[12], m0, m1);                                   \
+        G(v[1], v[5], v[9], v[13], m2, m3);                                   \
+        G(v[2], v[6], v[10], v[14], m4, m5);                                  \
+        G(v[3], v[7], v[11], v[15], m6, m7);                                  \
+                                                                              \
+        G(v[0], v[5], v[10], v[15], m8, m9);                                  \
+        G(v[1], v[6], v[11], v[12], mA, mB);                                  \
+        G(v[2], v[7], v[8], v[13], mC, mD);                                   \
+        G(v[3], v[4], v[9], v[14], mE, mF);                                   \
     } while (0)
 
 // n: nonce
