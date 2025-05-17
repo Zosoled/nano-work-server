@@ -24,19 +24,18 @@ enum BLAKE2B_IV {
     IV_15 = 0x5be0cd19137e2179UL,
 };
 
+static inline ulong rotr64(ulong v, char i)
+{
 #ifdef cl_amd_media_ops
 #pragma OPENCL EXTENSION cl_amd_media_ops : enable
-static inline ulong rotr64(ulong x, int shift)
-{
-    uint2 x2 = as_uint2(x);
-    if (shift < 32)
-        return as_ulong(amd_bitalign(x2.yx, x2, shift));
-    return as_ulong(amd_bitalign(x2, x2.yx, (shift - 32)));
-}
+    uint2 vv = as_uint2(v);
+    if (i < 32) {
+        return as_ulong(amd_bitalign(vv.yx, vv, i));
+    } else {
+        return as_ulong(amd_bitalign(vv, vv.yx, (i - 32)));
+    }
 #else
-static inline ulong rotr64(ulong x, int shift)
-{
-    return rotate(x, (ulong)(64UL - shift));
+    return rotate(v, (ulong)(64UL - i));
 }
 #endif
 
