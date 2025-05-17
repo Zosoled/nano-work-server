@@ -93,6 +93,7 @@ __kernel void nano_work(__constant ulong* attempt, __global ulong* result_a,
     __constant ulong* item_a, const ulong difficulty)
 {
     const ulong attempt_l = *attempt + get_global_id(0);
-    if (blake2b(attempt_l, item_a) >= difficulty)
+    if (blake2b(attempt_l, item_a) >= difficulty) {
         *result_a = attempt_l;
+    }
 }
