@@ -6,7 +6,7 @@
  * digest finalization flag: 0xffffffffffffffffUL (~0)
  */
 enum BLAKE2B_IV {
-    IV_0 = 0x6a09e667f2bdc900UL, // 0x6a09e667f3bcc908UL ^ PARAM
+    IV_0 = 0x6a09e667f3bcc908UL,
     IV_1 = 0xbb67ae8584caa73bUL,
     IV_2 = 0x3c6ef372fe94f82bUL,
     IV_3 = 0xa54ff53a5f1d36f1UL,
@@ -14,14 +14,9 @@ enum BLAKE2B_IV {
     IV_5 = 0x9b05688c2b3e6c1fUL,
     IV_6 = 0x1f83d9abfb41bd6bUL,
     IV_7 = 0x5be0cd19137e2179UL,
-    IV_8 = 0x6a09e667f3bcc908UL,
-    IV_9 = 0xbb67ae8584caa73bUL,
-    IV_10 = 0x3c6ef372fe94f82bUL,
-    IV_11 = 0xa54ff53a5f1d36f1UL,
-    IV_12 = 0x510e527fade682f9UL, // 0x510e527fade682d1UL ^ INLEN
-    IV_13 = 0x9b05688c2b3e6c1fUL,
-    IV_14 = 0xe07c265404be4294UL, // 0x1f83d9abfb41bd6bUL ^ DIGEST
-    IV_15 = 0x5be0cd19137e2179UL,
+    IV_PARAM = 0x6a09e667f2bdc900UL, // 0x6a09e667f3bcc908UL ^ PARAM
+    IV_INLEN = 0x510e527fade682f9UL, // 0x510e527fade682d1UL ^ INLEN
+    IV_FINAL = 0xe07c265404be4294UL, // 0x1f83d9abfb41bd6bUL ^ DIGEST
 };
 
 static inline ulong rotr64(ulong v, char i)
@@ -68,8 +63,10 @@ static inline ulong rotr64(ulong v, char i)
 // h: block hash
 static inline ulong blake2b(ulong const n, __constant ulong* h)
 {
-    ulong v[16] = { IV_0, IV_1, IV_2, IV_3, IV_4, IV_5, IV_6, IV_7,
-        IV_8, IV_9, IV_10, IV_11, IV_12, IV_13, IV_14, IV_15 };
+    ulong v[16] = {
+        IV_PARAM, IV_1, IV_2, IV_3, IV_4, IV_5, IV_6, IV_7,
+        IV_0, IV_1, IV_2, IV_3, IV_INLEN, IV_5, IV_FINAL, IV_7
+    };
     ulong m0 = n;
     ulong m1 = h[0];
     ulong m2 = h[1];
