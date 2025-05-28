@@ -17,7 +17,7 @@ If using more than one work peer, give the flag `--shuffle`. This makes it so th
 
 ## Installation
 
-### OpenCL 
+### OpenCL
 
 Ubuntu:
 
@@ -95,10 +95,9 @@ _Note_ difficulty values may be outdated in these examples.
     {
         "work": "2bf29ef00786a6bc",
         "difficulty": "ffffffd21c3933f4",
-        "multiplier": "1.3946469"        
+        "multiplier": "1.3946469"
     }
     ```
-
 
 - `work_validate` example:
 
