@@ -1,10 +1,15 @@
 /**
  * Nano PoW OpenCL kernel (BLAKE2b)
  *
- * Each thread concatenates a unique nonce with the blockhash and uses the
- * BLAKE2b hash algorithm to produces an 8-byte work result. If the result is
- * greater than or equal to the difficulty value, it is atomically written to a
- * global buffer to be read by the CPU.
+ * Each thread accepts a seed value and adds its global ID to create a unique
+ * 8-byte nonce. This nonce is then concatenated with a user-specified 32-byte
+ * value which represents either the hash of the frontier block of an account or
+ * the public key of an account if it is brand new and thus has no frontier.
+ *
+ * This concatenated 40-byte value is hashed using the BLAKE2b algorithm to
+ * produce an 8-byte result. If the result is greater than or equal to the
+ * difficulty value, the associated nonce is considered a valid work value and
+ * is written to a global buffer to be read by the CPU.
  *
  * BLAKE2b initialization:
  * Param block: 0x01010008 (depth = 1, fanout = 1, digest byte length = 8)
