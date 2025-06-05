@@ -93,7 +93,7 @@ static inline ulong blake2b(const ulong n, __constant ulong* h)
 
 __kernel void work_generate(
     __constant uchar* seed,
-    __constant uchar* blockhash,
+    __constant uchar* hash,
     __global uchar* work,
     const ulong difficulty)
 {
@@ -101,8 +101,8 @@ __kernel void work_generate(
         return;
     }
     const ulong nonce = *(__constant ulong*)seed + get_global_id(0);
-    const ulong hash = blake2b(nonce, (__constant ulong*)blockhash);
-    if (hash >= difficulty) {
+    const ulong result = blake2b(nonce, (__constant ulong*)hash);
+    if (result >= difficulty) {
         *(__global ulong*)work = nonce;
     }
 }
