@@ -422,9 +422,30 @@ impl RpcService {
                 for _ in 0..count {
                     roots.push(rand::random())
                 }
-                let start = Instant::now();
-                for root in roots {
-                    if self.generate_work(root, difficulty_l).await.is_err() {
+                let mut times: Vec<u64> = Vec::new();
+                times.reserve(count as usize);
+                let mut min: f64 = f64::MAX;
+                let mut logarithms: f64 = 0.0;
+                let mut max: f64 = 0.0;
+                let mut median: f64 = 0.0;
+                let mut reciprocals: f64 = 0.0;
+                let mut total: f64 = 0.0;
+                let truncated_boundary_start: u64 = f64::floor(count as f64 * 0.1) as u64;
+                let truncated_boundary_end: u64 = count - truncated_boundary_start;
+                let truncated_count: u64 = truncated_boundary_end - truncated_boundary_start;
+                let mut truncated_min: f64 = f64::MAX;
+                let mut truncated_logarithms: f64 = 0.0;
+                let mut truncated_max: f64 = 0.0;
+                let mut truncated_reciprocals: f64 = 0.0;
+                let mut truncated_total: f64 = 0.0;
+                for i in 0..count {
+                    let start: Instant = Instant::now();
+                    if self
+                        .generate_work(roots[i as usize], difficulty_l)
+                        .await
+                        .is_err()
+                    {
+                        println!("failed to generate work for benchmark");
                         return Ok((StatusCode::INTERNAL_SERVER_ERROR, {
                             json!({
                                 "error": "Benchmark failed",
@@ -432,18 +453,70 @@ impl RpcService {
                             })
                         }));
                     }
+                    let time = start.elapsed();
+                    times.push(time.as_micros() as u64);
                 }
-                let duration = start.elapsed().as_millis();
-                let average = duration as u64 / count;
-                println!("Benchmark finished in {duration}ms (average {average}ms)");
+                times.sort_unstable();
+                for i in 0..count {
+                    let time = times[i as usize] as f64 / 1000.0;
+                    total += time;
+                    reciprocals += 1.0 / (time as f64);
+                    logarithms += (time as f64).ln();
+                    if time < min {
+                        min = time;
+                    }
+                    if time > max {
+                        max = time;
+                    }
+                    if i == (count - 1) / 2 {
+                        median = time;
+                    }
+                    if i == count / 2 && count % 2 == 0 {
+                        median = (median + time) / 2.0;
+                    }
+                }
+                for i in truncated_boundary_start..truncated_boundary_end {
+                    let time = times[i as usize] as f64 / 1000.0;
+                    truncated_total += time;
+                    truncated_reciprocals += 1.0 / (time as f64);
+                    truncated_logarithms += (time as f64).ln();
+                    if time < truncated_min {
+                        truncated_min = time;
+                    }
+                    if time > truncated_max {
+                        truncated_max = time;
+                    }
+                }
+                let arithmetic: f64 = (total as f64) / (count as f64);
+                let geometric: f64 = (logarithms / (count as f64)).exp();
+                let harmonic: f64 = (count as f64) / reciprocals;
+                let truncated_arithmetic = (truncated_total as f64) / (truncated_count as f64);
+                let truncated_geometric: f64 =
+                    (truncated_logarithms / (truncated_count as f64)).exp();
+                let truncated_harmonic: f64 = (truncated_count as f64) / truncated_reciprocals;
+                let rate: f64 = 1000.0 / truncated_arithmetic;
+                let seconds: f64 = (total as f64) / 1000.0;
+                println!("Benchmark finished in {seconds:.4} seconds");
                 Ok((StatusCode::OK, {
                     json!({
                         "difficulty": format!("{:X}", difficulty_l),
-                        "multiplier": format!("{}", multiplier_l),
-                        "count": format!("{}", count),
-                        "duration": format!("{}", duration),
-                        "average": format!("{}", average),
-                        "hint": "Times in milliseconds",
+                        "multiplier": multiplier_l,
+                        "count": count,
+                        "total": total,
+                        "min": min,
+                        "max": max,
+                        "median": median,
+                        "arithmetic": arithmetic,
+                        "geometric": geometric,
+                        "harmonic": harmonic,
+                        "truncated_count": truncated_count,
+                        "truncated_total": truncated_total,
+                        "truncated_min": truncated_min,
+                        "truncated_max": truncated_max,
+                        "truncated_arithmetic": truncated_arithmetic,
+                        "truncated_geometric": truncated_geometric,
+                        "truncated_harmonic": truncated_harmonic,
+                        "rate": rate,
                     })
                 }))
             }
