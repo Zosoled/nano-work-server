@@ -575,7 +575,7 @@ impl RpcService {
                 for i in 0..runs {
                     match self.benchmark(difficulty_l, count).await {
                         Ok(results) => {
-                            println!("Score benchmark {} rate: {}", i, results.truncated_rate);
+                            println!("Benchmark {} score: {} wps", i + 1, results.truncated_rate);
                             rates.push(results.truncated_rate);
                         }
                         Err(e) => {
