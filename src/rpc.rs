@@ -9,6 +9,7 @@ use hyper::{
 use parking_lot::{Condvar, Mutex};
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     convert::Infallible,
@@ -88,6 +89,7 @@ enum RpcCommand {
     WorkCancel([u8; 32]),
     WorkValidate([u8; 32], [u8; 8], Option<u64>, Option<f64>),
     Benchmark(Option<u64>, Option<f64>, u64),
+    Score(Option<u64>, u64, u64),
     Status(),
 }
 
@@ -104,6 +106,28 @@ struct RpcService {
     work_state: Arc<(Mutex<WorkState>, Condvar)>,
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+struct BenchmarkResults {
+    difficulty: String,
+    count: u64,
+    total: f64,
+    rate: f64,
+    min: f64,
+    max: f64,
+    median: f64,
+    arithmetic: f64,
+    geometric: f64,
+    harmonic: f64,
+    truncated_count: u64,
+    truncated_total: f64,
+    truncated_rate: f64,
+    truncated_min: f64,
+    truncated_max: f64,
+    truncated_arithmetic: f64,
+    truncated_geometric: f64,
+    truncated_harmonic: f64,
+}
+
 impl RpcService {
     fn generate_work(
         &self,
@@ -117,6 +141,97 @@ impl RpcService {
         callback_recv
             .map_err(|_| WorkError::Errored)
             .and_then(|x| ready(x))
+    }
+
+    async fn benchmark(&self, difficulty: u64, count: u64) -> Result<BenchmarkResults, String> {
+        let _ = println!("Benchmarking {count} samples at difficulty {difficulty:X}");
+        let mut roots: Vec<[u8; 32]> = Vec::new();
+        roots.reserve(count as usize);
+        for _ in 0..count {
+            roots.push(rand::random())
+        }
+        let mut times: Vec<u64> = Vec::new();
+        times.reserve(count as usize);
+        let mut min: f64 = f64::MAX;
+        let mut logarithms: f64 = 0.0;
+        let mut max: f64 = 0.0;
+        let mut median: f64 = 0.0;
+        let mut reciprocals: f64 = 0.0;
+        let mut total: f64 = 0.0;
+        let truncated_boundary_start: u64 = f64::floor(count as f64 * 0.1) as u64;
+        let truncated_boundary_end: u64 = count - truncated_boundary_start;
+        let truncated_count: u64 = truncated_boundary_end - truncated_boundary_start;
+        let mut truncated_min: f64 = f64::MAX;
+        let mut truncated_logarithms: f64 = 0.0;
+        let mut truncated_max: f64 = 0.0;
+        let mut truncated_reciprocals: f64 = 0.0;
+        let mut truncated_total: f64 = 0.0;
+        for i in 0..count {
+            let start: Instant = Instant::now();
+            if self
+                .generate_work(roots[i as usize], difficulty)
+                .await
+                .is_err()
+            {
+                println!("failed to generate work for benchmark");
+                return Err("Benchmark failed".to_string());
+            }
+            let time = start.elapsed();
+            times.push(time.as_micros() as u64);
+        }
+        times.sort_unstable();
+        for i in 0..count {
+            let time = times[i as usize] as f64 / 1000.0;
+            total += time;
+            reciprocals += 1.0 / (time as f64);
+            logarithms += (time as f64).ln();
+            if time < min {
+                min = time;
+            }
+            if time > max {
+                max = time;
+            }
+            if i == (count - 1) / 2 {
+                median = time;
+            }
+            if i == count / 2 && count % 2 == 0 {
+                median = (median + time) / 2.0;
+            }
+        }
+        for i in truncated_boundary_start..truncated_boundary_end {
+            let time = times[i as usize] as f64 / 1000.0;
+            truncated_total += time;
+            truncated_reciprocals += 1.0 / (time as f64);
+            truncated_logarithms += (time as f64).ln();
+            if time < truncated_min {
+                truncated_min = time;
+            }
+            if time > truncated_max {
+                truncated_max = time;
+            }
+        }
+        let seconds: f64 = (total as f64) / 1000.0;
+        println!("Benchmark finished in {seconds:.4} seconds");
+        Ok(BenchmarkResults {
+            difficulty: format!("{:X}", difficulty),
+            count,
+            total,
+            rate: 1000.0 * (count as f64) / (total as f64),
+            min,
+            max,
+            median,
+            arithmetic: (total as f64) / (count as f64),
+            geometric: (logarithms / (count as f64)).exp(),
+            harmonic: (count as f64) / reciprocals,
+            truncated_count: truncated_count,
+            truncated_total: truncated_total,
+            truncated_rate: 1000.0 * (truncated_count as f64) / (truncated_total as f64),
+            truncated_min: truncated_min,
+            truncated_max: truncated_max,
+            truncated_arithmetic: (truncated_total as f64) / (truncated_count as f64),
+            truncated_geometric: (truncated_logarithms / (truncated_count as f64)).exp(),
+            truncated_harmonic: (truncated_count as f64) / truncated_reciprocals,
+        })
     }
 
     fn cancel_work(&self, root: [u8; 32]) {
@@ -277,6 +392,29 @@ impl RpcService {
         }
     }
 
+    fn parse_runs_json(json: &Value) -> Result<u64, Value> {
+        match json.get("runs") {
+            None => Err(json!({
+                "error": "Failed to deserialize JSON",
+                "hint": "runs field missing"
+            })),
+            Some(json) => {
+                let runs = json
+                    .as_u64()
+                    .filter(|&x| x > 0)
+                    .or(json
+                        .as_str()
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .filter(|&x| x > 0))
+                    .ok_or(json!({
+                        "error": "Failed to deserialize JSON",
+                        "hint": "Expecting a positive number for runs"
+                    }))?;
+                Ok(runs)
+            }
+        }
+    }
+
     fn parse_json(&self, json: Value) -> Result<RpcCommand, Value> {
         match json.get("action") {
             None => {
@@ -303,6 +441,11 @@ impl RpcService {
                 Self::parse_difficulty_json(&json)?,
                 Self::parse_multiplier_json(&json)?,
                 Self::parse_count_json(&json)?,
+            )),
+            Some(action) if action == "score" => Ok(RpcCommand::Score(
+                Self::parse_difficulty_json(&json)?,
+                Self::parse_count_json(&json)?,
+                Self::parse_runs_json(&json)?,
             )),
             Some(action) if action == "status" => Ok(RpcCommand::Status()),
             Some(_) => {
@@ -413,110 +556,52 @@ impl RpcService {
                     None => difficulty.unwrap_or(LIVE_DIFFICULTY),
                     Some(multiplier) => self.from_multiplier(multiplier),
                 };
-                let multiplier_l = self.to_multiplier(difficulty_l);
-                let _ = println!(
-                    "Benchmarking {count} samples at difficulty {difficulty_l:X} ({multiplier_l}x)"
-                );
-                let mut roots: Vec<[u8; 32]> = Vec::new();
-                roots.reserve(count as usize);
-                for _ in 0..count {
-                    roots.push(rand::random())
+                match self.benchmark(difficulty_l, count).await {
+                    Ok(results) => Ok((StatusCode::OK, { json!(results) })),
+                    Err(e) => Ok((StatusCode::INTERNAL_SERVER_ERROR, {
+                        json!({
+                            "error": "Benchmark failed",
+                            "hint": e
+                        })
+                    })),
                 }
-                let mut times: Vec<u64> = Vec::new();
-                times.reserve(count as usize);
-                let mut min: f64 = f64::MAX;
-                let mut logarithms: f64 = 0.0;
-                let mut max: f64 = 0.0;
-                let mut median: f64 = 0.0;
-                let mut reciprocals: f64 = 0.0;
-                let mut total: f64 = 0.0;
-                let truncated_boundary_start: u64 = f64::floor(count as f64 * 0.1) as u64;
-                let truncated_boundary_end: u64 = count - truncated_boundary_start;
-                let truncated_count: u64 = truncated_boundary_end - truncated_boundary_start;
-                let mut truncated_min: f64 = f64::MAX;
-                let mut truncated_logarithms: f64 = 0.0;
-                let mut truncated_max: f64 = 0.0;
+            }
+            RpcCommand::Score(difficulty, count, runs) => {
+                let difficulty_l = match difficulty {
+                    None => difficulty.unwrap_or(LIVE_DIFFICULTY),
+                    Some(difficulty) => difficulty,
+                };
+                let mut rates: Vec<f64> = Vec::new();
+                for i in 0..runs {
+                    match self.benchmark(difficulty_l, count).await {
+                        Ok(results) => {
+                            println!("Score benchmark {} rate: {}", i, results.truncated_rate);
+                            rates.push(results.truncated_rate);
+                        }
+                        Err(e) => {
+                            println!("Score benchmark {} failed: {}", i, e);
+                            return Ok((StatusCode::INTERNAL_SERVER_ERROR, {
+                                json!({
+                                    "error": "Scoring failed due to benchmark error",
+                                    "hint": format!("Score benchmark {} failed: {}", i, e)
+                                })
+                            }));
+                        }
+                    }
+                }
+                rates.sort_unstable_by(|a, b| a.partial_cmp(b).unwrap());
                 let mut truncated_reciprocals: f64 = 0.0;
-                let mut truncated_total: f64 = 0.0;
-                for i in 0..count {
-                    let start: Instant = Instant::now();
-                    if self
-                        .generate_work(roots[i as usize], difficulty_l)
-                        .await
-                        .is_err()
-                    {
-                        println!("failed to generate work for benchmark");
-                        return Ok((StatusCode::INTERNAL_SERVER_ERROR, {
-                            json!({
-                                "error": "Benchmark failed",
-                                "hint": "Work generation failure",
-                            })
-                        }));
-                    }
-                    let time = start.elapsed();
-                    times.push(time.as_micros() as u64);
-                }
-                times.sort_unstable();
-                for i in 0..count {
-                    let time = times[i as usize] as f64 / 1000.0;
-                    total += time;
-                    reciprocals += 1.0 / (time as f64);
-                    logarithms += (time as f64).ln();
-                    if time < min {
-                        min = time;
-                    }
-                    if time > max {
-                        max = time;
-                    }
-                    if i == (count - 1) / 2 {
-                        median = time;
-                    }
-                    if i == count / 2 && count % 2 == 0 {
-                        median = (median + time) / 2.0;
-                    }
-                }
+                let truncated_boundary_start: u64 = f64::floor(runs as f64 * 0.1) as u64;
+                let truncated_boundary_end: u64 = runs - truncated_boundary_start;
+                let truncated_count: u64 = truncated_boundary_end - truncated_boundary_start;
                 for i in truncated_boundary_start..truncated_boundary_end {
-                    let time = times[i as usize] as f64 / 1000.0;
-                    truncated_total += time;
-                    truncated_reciprocals += 1.0 / (time as f64);
-                    truncated_logarithms += (time as f64).ln();
-                    if time < truncated_min {
-                        truncated_min = time;
-                    }
-                    if time > truncated_max {
-                        truncated_max = time;
-                    }
+                    truncated_reciprocals += 1.0 / (rates[i as usize] as f64);
                 }
-                let arithmetic: f64 = (total as f64) / (count as f64);
-                let geometric: f64 = (logarithms / (count as f64)).exp();
-                let harmonic: f64 = (count as f64) / reciprocals;
-                let truncated_arithmetic = (truncated_total as f64) / (truncated_count as f64);
-                let truncated_geometric: f64 =
-                    (truncated_logarithms / (truncated_count as f64)).exp();
                 let truncated_harmonic: f64 = (truncated_count as f64) / truncated_reciprocals;
-                let rate: f64 = 1000.0 / truncated_arithmetic;
-                let seconds: f64 = (total as f64) / 1000.0;
-                println!("Benchmark finished in {seconds:.4} seconds");
+                println!("Scoring finished at {truncated_harmonic} wps");
                 Ok((StatusCode::OK, {
                     json!({
-                        "difficulty": format!("{:X}", difficulty_l),
-                        "multiplier": multiplier_l,
-                        "count": count,
-                        "total": total,
-                        "min": min,
-                        "max": max,
-                        "median": median,
-                        "arithmetic": arithmetic,
-                        "geometric": geometric,
-                        "harmonic": harmonic,
-                        "truncated_count": truncated_count,
-                        "truncated_total": truncated_total,
-                        "truncated_min": truncated_min,
-                        "truncated_max": truncated_max,
-                        "truncated_arithmetic": truncated_arithmetic,
-                        "truncated_geometric": truncated_geometric,
-                        "truncated_harmonic": truncated_harmonic,
-                        "rate": rate,
+                        "wps": truncated_harmonic,
                     })
                 }))
             }
